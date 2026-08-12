@@ -12,6 +12,7 @@ import type {
   AgentRole,
   AgentState,
   AuditEntry,
+  Commit,
   Escalation,
   Goal,
   Integration,
@@ -29,6 +30,7 @@ import type {
   Policy,
   Priority,
   Project,
+  PullRequest,
   Repository,
   ReviewVerdict,
   Task,
@@ -1196,6 +1198,121 @@ export class StudioRepository {
       defaultBranch: r.default_branch as string,
       protectedBranches: jparse(r.protected_branches as string, [] as string[]),
       createdAt: r.created_at as number,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Commits
+  // -------------------------------------------------------------------------
+
+  createCommit(input: Omit<Commit, "id" | "createdAt">): Commit {
+    const commit: Commit = { ...input, id: uuid(), createdAt: now() };
+    this.db
+      .prepare(
+        "INSERT INTO commits (id, repository_id, sha, message, author, branch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(
+        commit.id,
+        commit.repositoryId,
+        commit.sha ?? null,
+        commit.message,
+        commit.author ?? null,
+        commit.branch ?? null,
+        commit.createdAt,
+      );
+    return commit;
+  }
+
+  listCommits(repositoryId: string): Commit[] {
+    const rows = this.db
+      .prepare("SELECT * FROM commits WHERE repository_id = ? ORDER BY created_at")
+      .all(repositoryId) as Record<string, unknown>[];
+    return rows.map((r) => this.rowToCommit(r));
+  }
+
+  private rowToCommit(r: Record<string, unknown>): Commit {
+    return {
+      id: r.id as string,
+      repositoryId: r.repository_id as string,
+      sha: r.sha as string | undefined,
+      message: r.message as string,
+      author: r.author as string | undefined,
+      branch: r.branch as string | undefined,
+      createdAt: r.created_at as number,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Pull requests
+  // -------------------------------------------------------------------------
+
+  createPullRequest(input: Omit<PullRequest, "id" | "createdAt" | "updatedAt">): PullRequest {
+    const pr: PullRequest = { ...input, id: uuid(), createdAt: now(), updatedAt: now() };
+    this.db
+      .prepare(
+        "INSERT INTO pull_requests (id, repository_id, number, title, state, branch, base_branch, url, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(
+        pr.id,
+        pr.repositoryId,
+        pr.number ?? null,
+        pr.title,
+        pr.state,
+        pr.branch ?? null,
+        pr.baseBranch ?? null,
+        pr.url ?? null,
+        pr.createdAt,
+        pr.updatedAt,
+      );
+    return pr;
+  }
+
+  updatePullRequest(id: string, patch: Partial<PullRequest>): void {
+    const existing = this.getPullRequest(id);
+    if (!existing) throw new Error(`pull request not found: ${id}`);
+    const next = { ...existing, ...patch, id, updatedAt: now() };
+    this.db
+      .prepare(
+        "UPDATE pull_requests SET number=?, title=?, state=?, branch=?, base_branch=?, url=?, updated_at=? WHERE id=?",
+      )
+      .run(
+        next.number ?? null,
+        next.title,
+        next.state,
+        next.branch ?? null,
+        next.baseBranch ?? null,
+        next.url ?? null,
+        next.updatedAt,
+        id,
+      );
+  }
+
+  getPullRequest(id: string): PullRequest | undefined {
+    const row = this.db.prepare("SELECT * FROM pull_requests WHERE id = ?").get(id) as
+      | Record<string, unknown>
+      | undefined;
+    return row ? this.rowToPr(row) : undefined;
+  }
+
+  listPullRequests(repositoryId?: string): PullRequest[] {
+    const rows = repositoryId
+      ? (this.db.prepare("SELECT * FROM pull_requests WHERE repository_id = ? ORDER BY created_at").all(repositoryId) as Record<string, unknown>[])
+      : (this.db.prepare("SELECT * FROM pull_requests ORDER BY created_at").all() as Record<string, unknown>[]);
+    return rows.map((r) => this.rowToPr(r));
+  }
+
+  private rowToPr(r: Record<string, unknown>): PullRequest {
+    return {
+      id: r.id as string,
+      repositoryId: r.repository_id as string,
+      number: r.number as number | undefined,
+      title: r.title as string,
+      state: r.state as string,
+      branch: r.branch as string | undefined,
+      baseBranch: r.base_branch as string | undefined,
+      url: r.url as string | undefined,
+      createdAt: r.created_at as number,
+      updatedAt: r.updated_at as number,
     };
   }
 

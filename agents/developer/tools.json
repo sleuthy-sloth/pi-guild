@@ -8,7 +8,13 @@
     "find",
     "ls",
     "studio_list_tasks",
+    "studio_get_task",
     "studio_update_task",
-    "studio_send_message"
+    "studio_send_message",
+    "studio_git_start",
+    "studio_git_commit",
+    "studio_git_push",
+    "studio_git_pull_request",
+    "studio_git_status"
   ]
 }

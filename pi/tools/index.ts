@@ -78,6 +78,11 @@ export const STUDIO_TOOL_NAMES = [
   "studio_list_escalations",
   "studio_report_verdict",
   "studio_council",
+  "studio_git_start",
+  "studio_git_commit",
+  "studio_git_push",
+  "studio_git_pull_request",
+  "studio_git_status",
 ] as const;
 
 function tool<T extends TSchema>(
@@ -446,6 +451,40 @@ export function createStudioToolDefinitions(studio: Studio): ToolDefinition[] {
         return { text: `Goal ${params.id} -> ${params.status}`, details: { id: params.id, status: params.status } };
       },
     ),
+  );
+
+  // Git
+  defs.push(
+    tool("studio_git_start", "Start Git Branch", "Create a feature/bugfix branch for a task.", Type.Object({ taskId: Type.String() }), async (params) => {
+      const task = studio.tasks.get(params.taskId);
+      if (!task) throw new Error(`task not found: ${params.taskId}`);
+      const branch = await studio.git.startBranch(task);
+      return { text: `Started branch ${branch}`, details: { branch } };
+    }),
+    tool("studio_git_commit", "Git Commit", "Stage and commit changes for a task.", Type.Object({ taskId: Type.String(), message: Type.String() }), async (params) => {
+      const task = studio.tasks.get(params.taskId);
+      if (!task) throw new Error(`task not found: ${params.taskId}`);
+      const commit = await studio.git.commit(task, params.message);
+      return { text: `Committed ${commit.sha ?? ""} on ${commit.branch}`, details: { commit } };
+    }),
+    tool("studio_git_push", "Git Push", "Push a task's branch to its remote.", Type.Object({ taskId: Type.String() }), async (params) => {
+      const task = studio.tasks.get(params.taskId);
+      if (!task) throw new Error(`task not found: ${params.taskId}`);
+      await studio.git.push(task);
+      return { text: `Pushed ${task.branch ?? "branch"}`, details: { branch: task.branch } };
+    }),
+    tool("studio_git_pull_request", "Open Pull Request", "Open a pull request for a task's branch.", Type.Object({ taskId: Type.String(), title: Type.Optional(Type.String()), body: Type.Optional(Type.String()) }), async (params) => {
+      const task = studio.tasks.get(params.taskId);
+      if (!task) throw new Error(`task not found: ${params.taskId}`);
+      const pr = await studio.git.openPullRequest(task, { title: params.title, body: params.body });
+      return { text: `Opened PR ${pr.url ?? pr.number}`, details: { pr } };
+    }),
+    tool("studio_git_status", "Git Status", "Show the working tree status for a task.", Type.Object({ taskId: Type.String() }), async (params) => {
+      const task = studio.tasks.get(params.taskId);
+      if (!task) throw new Error(`task not found: ${params.taskId}`);
+      const status = await studio.git.status(task);
+      return { text: `branch=${status.branch} clean=${status.clean}`, details: status };
+    }),
   );
 
   // Status + escalation + verdict + council

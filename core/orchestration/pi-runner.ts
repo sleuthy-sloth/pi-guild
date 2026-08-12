@@ -83,6 +83,14 @@ function buildTaskPrompt(task: Task, roleName?: string): string {
     lines.push("");
     lines.push(`Labels: ${task.labels.join(", ")}`);
   }
+  if (task.branch) {
+    lines.push("");
+    lines.push(`Branch: ${task.branch}`);
+  }
+  if (task.pr) {
+    lines.push("");
+    lines.push(`Pull request: ${task.pr}`);
+  }
 
   lines.push("");
   switch (roleName) {

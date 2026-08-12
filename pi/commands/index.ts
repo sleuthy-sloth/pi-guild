@@ -6,9 +6,12 @@
  * `ctx.ui.notify`, or drives an interactive dialog when `ctx.hasUI`.
  */
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { StudioEvents } from "../../core/events.ts";
 import { defaultDbPath } from "../../database/db.ts";
 import { ProjectRunner, type ReviewPolicy } from "../../core/orchestration/index.ts";
+import { GitHubProvider, LocalGitProvider } from "../../integrations/git/index.ts";
 import { currentOrgId } from "../state.ts";
 import type { Studio } from "../state.ts";
 import { formatAgents, formatLive, formatTasks } from "../ui/index.ts";
@@ -22,6 +25,8 @@ const HELP = [
   "  council [question | members | add <provider>/<model>]",
   "  bg [<role> <prompt>]           fire-and-forget background job",
   "  live                          refresh the live agent panel",
+  "  git setup <project> local <path> | github <url>",
+  "  git branch|commit|push|pr|log <taskId>",
   "  status                        org/project/agent/task counts + paused flag",
   "  setup                         wizard: create org + seed default policies",
   "  org [create <name> | use <id>]",
@@ -122,6 +127,72 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
     async live(_rest, ctx): Promise<string> {
       refreshLive(ctx);
       return formatLive(studio);
+    },
+
+    async git(rest): Promise<string> {
+      const [verb, ...args] = rest;
+      const requireTask = (id: string) => {
+        const task = studio.tasks.get(id);
+        if (!task) throw new Error(`task not found: ${id}`);
+        return task;
+      };
+
+      if (verb === "setup") {
+        const [projectId, kind, target] = args;
+        if (!projectId || !kind || !target) return "usage: /studio git setup <project> local <path> | github <url>";
+        const project = studio.project.get(projectId);
+        if (!project) return `No project with id ${projectId}`;
+        if (kind === "github") {
+          const path = join(homedir(), ".pi", "agent", "pi-studio", "workspaces", projectId);
+          const provider = new GitHubProvider(target, path);
+          await provider.clone();
+          studio.git.register(projectId, { kind: "github", path, url: target });
+          return `Cloned ${target} → ${path} and registered as a GitHub repository.`;
+        }
+        if (kind === "local") {
+          const provider = new LocalGitProvider(target);
+          await provider.init();
+          studio.git.register(projectId, { kind: "local", path: target });
+          return `Initialized local repository at ${target}.`;
+        }
+        return "usage: /studio git setup <project> local <path> | github <url>";
+      }
+
+      if (verb === "branch") {
+        const branch = await studio.git.startBranch(requireTask(args[0]));
+        return `Branch ${branch}`;
+      }
+      if (verb === "commit") {
+        const task = requireTask(args[0]);
+        const message = args.slice(1).join(" ").trim();
+        if (!message) return "usage: /studio git commit <taskId> <message>";
+        const commit = await studio.git.commit(task, message);
+        return `Committed ${commit.sha ?? ""}`;
+      }
+      if (verb === "push") {
+        const task = requireTask(args[0]);
+        await studio.git.push(task);
+        return `Pushed ${task.branch ?? "branch"}`;
+      }
+      if (verb === "pr") {
+        const task = requireTask(args[0]);
+        const pr = await studio.git.openPullRequest(task);
+        return `PR ${pr.url ?? pr.number}`;
+      }
+      if (verb === "log") {
+        const task = requireTask(args[0]);
+        const repository = studio.git.repositoryFor(task.projectId);
+        if (!repository) return "No repository configured for this task's project.";
+        const commits = studio.repo.listCommits(repository.id);
+        return commits.length === 0
+          ? "(no commits)"
+          : commits.map((c) => `${c.sha?.slice(0, 7) ?? ""}  ${c.branch ?? ""}  ${c.message}`).join("\n");
+      }
+
+      const repos = studio.repo.listRepositories();
+      return repos.length === 0
+        ? "(no repositories — /studio git setup <project> local <path> | github <url>)"
+        : repos.map((r) => `${r.id}  [${r.kind}] ${r.path ?? r.url}  (project ${r.projectId})`).join("\n");
     },
 
     async council(rest, ctx): Promise<string> {

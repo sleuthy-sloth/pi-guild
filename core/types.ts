@@ -262,6 +262,29 @@ export interface Repository {
   createdAt: number;
 }
 
+export interface Commit {
+  id: string;
+  repositoryId: string;
+  sha?: string;
+  message: string;
+  author?: string;
+  branch?: string;
+  createdAt: number;
+}
+
+export interface PullRequest {
+  id: string;
+  repositoryId: string;
+  number?: number;
+  title: string;
+  state: string; // "open" | "closed" | "merged"
+  branch?: string;
+  baseBranch?: string;
+  url?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface Integration {
   id: string;
   kind: IntegrationKind;

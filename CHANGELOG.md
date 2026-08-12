@@ -4,6 +4,24 @@ All notable changes to Pi Studio are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - unreleased
+
+### Added
+
+- **Git workflow** (`core/git/service.ts`, `integrations/git/`) — developers
+  create branches (`feature/<taskId>-<slug>`, `bugfix/`, `refactor/`), commit,
+  push, and open pull requests, with protected-branch defaults and DB recording
+  of commits and PRs.
+- **RepositoryProvider abstraction** — `LocalGitProvider` (git CLI) and
+  `GitHubProvider` (`gh` CLI), plus a testable `CommandRunner` seam.
+- **Git tools** — `studio_git_start/commit/push/pull_request/status`, wired into
+  the Developer role.
+- **`/studio git` command** — setup (local/github), branch, commit, push, pr, log.
+
+### Changed
+
+- Reviewer task prompts include the linked pull request.
+
 ## [0.3.0] - unreleased
 
 ### Added

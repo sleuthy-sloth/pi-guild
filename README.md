@@ -146,6 +146,8 @@ All commands live under the `/studio` namespace:
 | `/studio council [question]` / `members` / `add <provider>/<model>` | multi-model synthesis |
 | `/studio bg <role> <prompt>` | fire-and-forget background job |
 | `/studio live` | refresh the live agent panel |
+| `/studio git setup <project> local <path>` / `github <url>` | register a repository |
+| `/studio git branch` / `commit` / `push` / `pr` / `log <taskId>` | the git workflow |
 | `/studio setup` | wizard: create DB, seed roles + default policies |
 | `/studio status` | org/project/agent/task counts + pause flag |
 | `/studio org` / `org create <name>` / `org use <id>` | list / create / select organizations |
@@ -188,16 +190,25 @@ Roles are **data-driven**: edit the files in `agents/<role>/` to change a role's
 tools, permissions, or system prompt without touching code. `seedRoles()` is
 idempotent and falls back to the built-in defaults when files are missing.
 
-## Plane + GitHub status
+## Git + GitHub status
 
-Git, GitHub, and Plane integrations are **later milestones** — not part of the
-0.1.0 release. When they land:
+The git workflow is implemented: developer agents create branches, commit, push,
+and open pull requests via the `studio_git_*` tools (or `/studio git ...`), with
+protected-branch defaults and branch naming (`feature/<taskId>-<slug>`, `bugfix/`,
+`refactor/`). Local git and GitHub (`gh` CLI) sit behind one
+`RepositoryProvider` abstraction.
 
-- **Git / GitHub** — branch creation, PRs, and review sync through `integrations/`.
-- **Plane** — optional issue/board mirroring; SQLite remains the source of truth,
-  and Plane never defines the internal shape.
+```text
+/studio git setup <project> github https://github.com/you/repo
+/studio git branch <taskId>      # create feature/<taskId>-<slug>
+/studio git commit <taskId> "Implement X"
+/studio git push <taskId>
+/studio git pr <taskId>          # open a pull request
+```
 
-The optional browser dashboard under `ui/` is also a **later milestone**.
+Commits and pull requests are recorded in the local database; the reviewer's
+prompt includes the PR link. **Plane** and the optional browser dashboard remain
+**later milestones** (SQLite stays the source of truth regardless).
 
 ---
 

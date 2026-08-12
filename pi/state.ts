@@ -31,6 +31,7 @@ import {
   Scheduler,
 } from "../core/orchestration/index.ts";
 import { seedRoles } from "../agents/roles.ts";
+import { GitService } from "../core/git/service.ts";
 import { createStudioToolDefinitions } from "./tools/index.ts";
 
 export { currentOrgId } from "./currentOrg.ts";
@@ -51,6 +52,7 @@ export interface Studio {
   router: ModelRouter;
   spawner: AgentSpawner;
   council: Council;
+  git: GitService;
   paused: boolean;
 }
 
@@ -77,6 +79,7 @@ export function getStudio(): Studio {
   const scheduler = new Scheduler(repo, bus);
   const router = new ModelRouter(repo);
   const council = new Council(repo, createCouncilResponder());
+  const git = new GitService(repo);
 
   const studio: Studio = {
     db,
@@ -95,6 +98,7 @@ export function getStudio(): Studio {
     // Assigned below so the spawner's customTools closure can reference `studio`.
     spawner: null as unknown as AgentSpawner,
     council,
+    git,
     paused: false,
   };
 
