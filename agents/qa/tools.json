@@ -8,7 +8,9 @@
     "find",
     "ls",
     "studio_list_tasks",
+    "studio_get_task",
     "studio_update_task",
+    "studio_report_verdict",
     "studio_send_message"
   ]
 }

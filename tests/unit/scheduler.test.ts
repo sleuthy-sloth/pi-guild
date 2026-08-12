@@ -87,4 +87,19 @@ describe("Scheduler", () => {
     expect(repo.getTask(blocked.id)?.assigneeId).toBeNull();
     expect(repo.getTask(blocked.id)?.state).toBe("BACKLOG");
   });
+
+  it("filters available agents by role", () => {
+    const o = org();
+    const p = project(o.id);
+    idleAgent(o.id, p.id, "dev-1");
+    const reviewer = agents.create({ name: "rev-1", organizationId: o.id, roleName: "Reviewer", projectId: p.id });
+    agents.setState(reviewer.id, "IDLE");
+    repo.createTask({ title: "t1", projectId: p.id });
+
+    const scheduler = new Scheduler(repo, undefined, { maxConcurrentAgents: 4 });
+    const assignments = scheduler.tick(p.id, { roleName: "Reviewer" });
+
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0].agent.roleName).toBe("Reviewer");
+  });
 });

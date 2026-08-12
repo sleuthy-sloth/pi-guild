@@ -53,22 +53,27 @@ export class Scheduler {
       });
   }
 
-  /** IDLE persistent/ephemeral agents, optionally scoped to a project. */
-  availableAgents(projectId?: string): Agent[] {
+  /** IDLE persistent/ephemeral agents, optionally scoped to a project + role. */
+  availableAgents(projectId?: string, roleName?: string): Agent[] {
     return this.repo
       .listAgents({ projectId, state: "IDLE" })
-      .filter((a) => a.kind === "persistent" || a.kind === "ephemeral");
+      .filter(
+        (a) =>
+          (a.kind === "persistent" || a.kind === "ephemeral") &&
+          (!roleName || a.roleName === roleName),
+      );
   }
 
   /**
    * Pair ready tasks to available agents up to `maxConcurrentAgents`.
-   * Never pairs two tasks from the same project in one tick.
+   * Never pairs two tasks from the same project in one tick. When `roleName`
+   * is given, only agents of that role are considered.
    */
-  tick(projectId?: string): Array<{ task: Task; agent: Agent }> {
+  tick(projectId?: string, opts: { roleName?: string } = {}): Array<{ task: Task; agent: Agent }> {
     const assignments: Array<{ task: Task; agent: Agent }> = [];
     const usedProjectIds = new Set<string>();
     const ready = this.readyTasks(projectId);
-    const available = this.availableAgents(projectId);
+    const available = this.availableAgents(projectId, opts.roleName);
 
     for (const task of ready) {
       if (assignments.length >= this.maxConcurrentAgents) break;

@@ -90,29 +90,36 @@ allowed, dangerous actions denied).
 
 ## Quick start
 
+Just run `/studio` and answer the prompts — Pi Studio plans and runs the
+whole team itself:
+
 ```text
-# 1. Create the organization and a project
-/studio setup                 # creates DB, seeds roles + default policies
+/studio
+```
+
+It asks what to build, the project name, and the approval policy, then creates
+the organization/project/goal, spawns a manager to decompose the work into
+tasks, and runs developers → reviewers → QA through to `DONE`, reporting
+progress as it goes. Hold it anytime with `/studio pause`, resume with
+`/studio resume`, and check where things stand with `/studio status`.
+
+Prefer the manual controls? They still work:
+
+```text
+/studio setup
 /studio org create "Acme"
 /studio projects create "calculator"
-
-# 2. Spawn an agent and assign it a task
 /studio agents spawn Developer
 /studio tasks create <project-id> "Build a four-function calculator"
 /studio tasks assign <task-id> <agent-id>
-
-# 3. Inspect state
-/studio status
-/studio agents
-/studio tasks
 ```
 
 Tasks flow through the dependency-aware scheduler: a task becomes `READY` only
 when every dependency is `DONE`, and the scheduler pairs `READY` tasks with
 `IDLE` agents up to the configured concurrency limit. Managers never poll —
 task completion emits `task.completed`, which wakes any agent `WAITING` on that
-work. Decomposition and dependency wiring are exercised end-to-end in
-tests/e2e/calculator.e2e.test.ts.
+work. The full plan → run → review → QA pipeline is exercised end-to-end in
+tests/e2e/autonomous.e2e.test.ts.
 
 ## Configuration
 
@@ -135,6 +142,7 @@ All commands live under the `/studio` namespace:
 
 | Command | Purpose |
 |---------|---------|
+| `/studio` / `run` | guided wizard: plan + run a job autonomously |
 | `/studio setup` | wizard: create DB, seed roles + default policies |
 | `/studio status` | org/project/agent/task counts + pause flag |
 | `/studio org` / `org create <name>` / `org use <id>` | list / create / select organizations |

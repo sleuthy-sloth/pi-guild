@@ -8,3 +8,5 @@ export {
   type AgentRunResult,
 } from "./spawner.ts";
 export { createPiRunner, type CreatePiRunnerOptions } from "./pi-runner.ts";
+export { ProjectRunner, type ReviewPolicy, type RunOptions, type RunSummary } from "./runner.ts";
+export type { RunTransitionOptions } from "./spawner.ts";

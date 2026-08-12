@@ -1,16 +1,18 @@
 /**
  * Pi Studio LLM-callable tools (spec §6, §54).
  *
- * Every tool delegates to the domain services (never raw SQL) and returns a
- * compact text summary plus structured `details`. Enums use `StringEnum` from
- * `@earendil-works/pi-ai` (Google-compatible); schemas are strict TypeBox.
+ * `createStudioToolDefinitions(studio)` returns plain ToolDefinitions shared by
+ * the extension (pi.registerTool) and by spawned agent sessions (customTools),
+ * so every agent sees the same surface. Every tool delegates to the domain
+ * services (never raw SQL) and returns a compact text summary plus structured
+ * `details`. Enums use `StringEnum` (Google-compatible); schemas are strict TypeBox.
  */
 import { StringEnum, Type } from "@earendil-works/pi-ai";
 import type { Static, TSchema } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { Task } from "../../core/types.ts";
 import { StudioEvents } from "../../core/events.ts";
-import { currentOrgId, getStudio } from "../state.ts";
+import { currentOrgId } from "../currentOrg.ts";
 import type { Studio } from "../state.ts";
 import { formatAgents, formatTasks } from "../ui/index.ts";
 
@@ -39,8 +41,14 @@ const TASK_STATES = [
   "DONE",
   "CANCELLED",
 ] as const;
+const GOAL_STATUSES = ["open", "in_progress", "done", "cancelled"] as const;
+const VERDICTS = ["approve", "request_changes", "pass", "fail"] as const;
 
-/** Keep in sync with the `tool(...)` registrations below. */
+interface ToolOutput {
+  text: string;
+  details: Record<string, unknown>;
+}
+
 export const STUDIO_TOOL_NAMES = [
   "studio_list_projects",
   "studio_get_project",
@@ -50,6 +58,9 @@ export const STUDIO_TOOL_NAMES = [
   "studio_create_task",
   "studio_update_task",
   "studio_assign_task",
+  "studio_decompose_task",
+  "studio_add_task_dependency",
+  "studio_list_task_dependencies",
   "studio_list_agents",
   "studio_spawn_agent",
   "studio_stop_agent",
@@ -60,38 +71,34 @@ export const STUDIO_TOOL_NAMES = [
   "studio_record_decision",
   "studio_get_goal",
   "studio_create_goal",
+  "studio_list_goals",
+  "studio_set_goal_status",
   "studio_get_agent_status",
   "studio_escalate_to_human",
   "studio_list_escalations",
+  "studio_report_verdict",
 ] as const;
 
-interface ToolOutput {
-  text: string;
-  details: Record<string, unknown>;
+function tool<T extends TSchema>(
+  name: string,
+  label: string,
+  description: string,
+  parameters: T,
+  run: (params: Static<T>) => ToolOutput,
+): ToolDefinition<any, any> {
+  return {
+    name,
+    label,
+    description,
+    parameters,
+    async execute(_toolCallId, params, _signal, _onUpdate) {
+      const { text, details } = run(params as Static<T>);
+      return { content: [{ type: "text", text }], details };
+    },
+  };
 }
 
-export function registerStudioTools(pi: ExtensionAPI, studio: Studio): void {
-  // Local helper: closes over `studio` so every execute() runs against the
-  // shared lazy singleton.
-  function tool<T extends TSchema>(
-    name: string,
-    label: string,
-    description: string,
-    parameters: T,
-    run: (params: Static<T>) => ToolOutput,
-  ): ToolDefinition<T, Record<string, unknown>> {
-    return {
-      name,
-      label,
-      description,
-      parameters,
-      async execute(_toolCallId, params, _signal, _onUpdate) {
-        const { text, details } = run(params);
-        return { content: [{ type: "text", text }], details };
-      },
-    };
-  }
-
+export function createStudioToolDefinitions(studio: Studio): ToolDefinition[] {
   const projectsText = (): string => {
     const projects = studio.project.list();
     if (projects.length === 0) return "(no projects)";
@@ -136,40 +143,24 @@ export function registerStudioTools(pi: ExtensionAPI, studio: Studio): void {
     return escalation;
   };
 
+  const defs: ToolDefinition<any, any>[] = [];
+
   // Projects
-  pi.registerTool(
+  defs.push(
     tool("studio_list_projects", "List Projects", "List all Pi Studio projects.", Type.Object({}), () => {
       const projects = studio.project.list();
       return { text: projectsText(), details: { projects } };
     }),
-  );
-
-  pi.registerTool(
-    tool(
-      "studio_get_project",
-      "Get Project",
-      "Get a single project by id.",
-      Type.Object({ id: Type.String() }),
-      (params) => {
-        const project = studio.project.get(params.id);
-        if (!project) return { text: `Project not found: ${params.id}`, details: { id: params.id } };
-        return {
-          text: `${project.id}  ${project.name}  (org ${project.organizationId})`,
-          details: { project },
-        };
-      },
-    ),
-  );
-
-  pi.registerTool(
+    tool("studio_get_project", "Get Project", "Get a single project by id.", Type.Object({ id: Type.String() }), (params) => {
+      const project = studio.project.get(params.id);
+      if (!project) return { text: `Project not found: ${params.id}`, details: { id: params.id } };
+      return { text: `${project.id}  ${project.name}  (org ${project.organizationId})`, details: { project } };
+    }),
     tool(
       "studio_create_project",
       "Create Project",
       "Create a project in an organization.",
-      Type.Object({
-        name: Type.String(),
-        organizationId: Type.Optional(Type.String()),
-      }),
+      Type.Object({ name: Type.String(), organizationId: Type.Optional(Type.String()) }),
       (params) => {
         const organizationId = requireOrg(params.organizationId);
         const project = studio.project.create(organizationId, params.name);
@@ -179,7 +170,7 @@ export function registerStudioTools(pi: ExtensionAPI, studio: Studio): void {
   );
 
   // Tasks
-  pi.registerTool(
+  defs.push(
     tool(
       "studio_list_tasks",
       "List Tasks",
@@ -190,32 +181,21 @@ export function registerStudioTools(pi: ExtensionAPI, studio: Studio): void {
         return { text: formatTasks(tasks), details: { tasks } };
       },
     ),
-  );
-
-  pi.registerTool(
-    tool(
-      "studio_get_task",
-      "Get Task",
-      "Get a single task by id.",
-      Type.Object({ id: Type.String() }),
-      (params) => {
-        const task = studio.tasks.get(params.id);
-        if (!task) return { text: `Task not found: ${params.id}`, details: { id: params.id } };
-        return { text: `${task.id}  [${task.state}] ${task.title}`, details: { task } };
-      },
-    ),
-  );
-
-  pi.registerTool(
+    tool("studio_get_task", "Get Task", "Get a single task by id.", Type.Object({ id: Type.String() }), (params) => {
+      const task = studio.tasks.get(params.id);
+      if (!task) return { text: `Task not found: ${params.id}`, details: { id: params.id } };
+      return { text: `${task.id}  [${task.state}] ${task.title}`, details: { task } };
+    }),
     tool(
       "studio_create_task",
       "Create Task",
-      "Create a task in a project.",
+      "Create a task in a project, optionally under a parent task.",
       Type.Object({
         title: Type.String(),
         projectId: Type.String(),
         description: Type.Optional(Type.String()),
         acceptanceCriteria: Type.Optional(Type.Array(Type.String())),
+        parentId: Type.Optional(Type.String()),
       }),
       (params) => {
         const task = studio.tasks.create({
@@ -223,13 +203,11 @@ export function registerStudioTools(pi: ExtensionAPI, studio: Studio): void {
           projectId: params.projectId,
           description: params.description,
           acceptanceCriteria: params.acceptanceCriteria,
+          parentId: params.parentId,
         });
         return { text: `Created task ${task.id} "${task.title}"`, details: { task } };
       },
     ),
-  );
-
-  pi.registerTool(
     tool(
       "studio_update_task",
       "Update Task",
@@ -262,23 +240,48 @@ export function registerStudioTools(pi: ExtensionAPI, studio: Studio): void {
         return { text: `Updated task ${params.id}`, details: { task } };
       },
     ),
-  );
-
-  pi.registerTool(
+    tool("studio_assign_task", "Assign Task", "Assign a task to an agent.", Type.Object({ taskId: Type.String(), agentId: Type.String() }), (params) => {
+      studio.tasks.assign(params.taskId, params.agentId);
+      return { text: `Assigned task ${params.taskId} to agent ${params.agentId}`, details: { taskId: params.taskId, agentId: params.agentId } };
+    }),
     tool(
-      "studio_assign_task",
-      "Assign Task",
-      "Assign a task to an agent.",
-      Type.Object({ taskId: Type.String(), agentId: Type.String() }),
+      "studio_decompose_task",
+      "Decompose Task",
+      "Break a task into child subtasks.",
+      Type.Object({
+        id: Type.String(),
+        children: Type.Array(Type.Object({ title: Type.String(), description: Type.Optional(Type.String()) })),
+      }),
       (params) => {
-        studio.tasks.assign(params.taskId, params.agentId);
-        return { text: `Assigned task ${params.taskId} to agent ${params.agentId}`, details: { taskId: params.taskId, agentId: params.agentId } };
+        const children = studio.tasks.decompose(params.id, params.children);
+        return { text: `Created ${children.length} subtask(s) under ${params.id}`, details: { children } };
+      },
+    ),
+    tool(
+      "studio_add_task_dependency",
+      "Add Task Dependency",
+      "Make a task depend on another task (rejects cycles).",
+      Type.Object({ taskId: Type.String(), dependsOnId: Type.String() }),
+      (params) => {
+        studio.tasks.addDependency(params.taskId, params.dependsOnId);
+        return { text: `Task ${params.taskId} now depends on ${params.dependsOnId}`, details: { taskId: params.taskId, dependsOnId: params.dependsOnId } };
+      },
+    ),
+    tool(
+      "studio_list_task_dependencies",
+      "List Task Dependencies",
+      "List the tasks a given task depends on.",
+      Type.Object({ id: Type.String() }),
+      (params) => {
+        const deps = studio.tasks.dependencies(params.id);
+        const text = deps.length === 0 ? "(no dependencies)" : deps.map((d) => `${d.id}  [${d.state}] ${d.title}`).join("\n");
+        return { text, details: { dependencies: deps } };
       },
     ),
   );
 
   // Agents
-  pi.registerTool(
+  defs.push(
     tool(
       "studio_list_agents",
       "List Agents",
@@ -289,9 +292,6 @@ export function registerStudioTools(pi: ExtensionAPI, studio: Studio): void {
         return { text: formatAgents(agents), details: { agents } };
       },
     ),
-  );
-
-  pi.registerTool(
     tool(
       "studio_spawn_agent",
       "Spawn Agent",
@@ -306,13 +306,9 @@ export function registerStudioTools(pi: ExtensionAPI, studio: Studio): void {
       (params) => {
         const organizationId = requireOrg(params.organizationId);
         const roles = studio.repo.listRoles();
-        const role = roles.find(
-          (r) => r.name.toLowerCase() === params.roleName.toLowerCase(),
-        );
+        const role = roles.find((r) => r.name.toLowerCase() === params.roleName.toLowerCase());
         if (!role) {
-          throw new Error(
-            `Unknown role "${params.roleName}". Available: ${roles.map((r) => r.name).join(", ") || "none"}`,
-          );
+          throw new Error(`Unknown role "${params.roleName}". Available: ${roles.map((r) => r.name).join(", ") || "none"}`);
         }
         const agent = studio.agents.create({
           name: params.name,
@@ -324,35 +320,23 @@ export function registerStudioTools(pi: ExtensionAPI, studio: Studio): void {
           state: "IDLE",
           kind: "persistent",
         });
-        return {
-          text: `Spawned agent ${agent.id} "${agent.name}" (role ${agent.roleName})`,
-          details: { agent },
-        };
+        return { text: `Spawned agent ${agent.id} "${agent.name}" (role ${agent.roleName})`, details: { agent } };
       },
     ),
-  );
-
-  pi.registerTool(
-    tool(
-      "studio_stop_agent",
-      "Stop Agent",
-      "Abort an agent's current run and mark it stopped.",
-      Type.Object({ id: Type.String() }),
-      (params) => {
-        const agent = studio.agents.get(params.id);
-        if (!agent) return { text: `Agent not found: ${params.id}`, details: { id: params.id } };
-        studio.spawner.stop(params.id);
-        return { text: `Stopped agent ${params.id}`, details: { agent: studio.agents.get(params.id) } };
-      },
-    ),
+    tool("studio_stop_agent", "Stop Agent", "Abort an agent's current run and mark it stopped.", Type.Object({ id: Type.String() }), (params) => {
+      const agent = studio.agents.get(params.id);
+      if (!agent) return { text: `Agent not found: ${params.id}`, details: { id: params.id } };
+      studio.spawner.stop(params.id);
+      return { text: `Stopped agent ${params.id}`, details: { agent: studio.agents.get(params.id) } };
+    }),
   );
 
   // Messaging
-  pi.registerTool(
+  defs.push(
     tool(
       "studio_send_message",
       "Send Message",
-      "Send a message to a recipient (agent id, \"human\", \"all\", or a group id).",
+      'Send a message to a recipient (agent id, "human", "all", or a group id).',
       Type.Object({
         recipientId: Type.String(),
         content: Type.String(),
@@ -363,7 +347,7 @@ export function registerStudioTools(pi: ExtensionAPI, studio: Studio): void {
       }),
       (params) => {
         const message = studio.messaging.send({
-          senderName: "human",
+          senderName: "agent",
           recipientId: params.recipientId,
           content: params.content,
           messageType: params.messageType ?? "STATUS",
@@ -374,89 +358,44 @@ export function registerStudioTools(pi: ExtensionAPI, studio: Studio): void {
         return { text: `Sent message ${message.id} to ${message.recipientId}`, details: { message } };
       },
     ),
-  );
-
-  pi.registerTool(
     tool(
       "studio_list_messages",
       "List Messages",
       "List messages, optionally filtered by recipient, project, or task.",
-      Type.Object({
-        recipientId: Type.Optional(Type.String()),
-        projectId: Type.Optional(Type.String()),
-        taskId: Type.Optional(Type.String()),
-      }),
+      Type.Object({ recipientId: Type.Optional(Type.String()), projectId: Type.Optional(Type.String()), taskId: Type.Optional(Type.String()) }),
       (params) => {
-        const messages = studio.messaging.list({
-          recipientId: params.recipientId,
-          projectId: params.projectId,
-          taskId: params.taskId,
-        });
+        const messages = studio.messaging.list({ recipientId: params.recipientId, projectId: params.projectId, taskId: params.taskId });
         const text =
           messages.length === 0
             ? "(no messages)"
-            : messages
-                .map(
-                  (m) =>
-                    `${m.id}  ${m.senderName} -> ${m.recipientId}  [${m.messageType}] ${m.content.slice(0, 120)}`,
-                )
-                .join("\n");
+            : messages.map((m) => `${m.id}  ${m.senderName} -> ${m.recipientId}  [${m.messageType}] ${m.content.slice(0, 120)}`).join("\n");
         return { text, details: { messages } };
       },
     ),
   );
 
   // Memory
-  pi.registerTool(
-    tool(
-      "studio_get_project_memory",
-      "Get Project Memory",
-      "List memory entries for a project.",
-      Type.Object({ projectId: Type.String() }),
-      (params) => {
-        const entries = studio.memory.list("project", params.projectId);
-        const text =
-          entries.length === 0
-            ? "(no memory)"
-            : entries.map((m) => `${m.id}  [${m.kind}] ${m.content}`).join("\n");
-        return { text, details: { entries } };
-      },
-    ),
-  );
-
-  pi.registerTool(
+  defs.push(
+    tool("studio_get_project_memory", "Get Project Memory", "List memory entries for a project.", Type.Object({ projectId: Type.String() }), (params) => {
+      const entries = studio.memory.list("project", params.projectId);
+      const text = entries.length === 0 ? "(no memory)" : entries.map((m) => `${m.id}  [${m.kind}] ${m.content}`).join("\n");
+      return { text, details: { entries } };
+    }),
     tool(
       "studio_add_memory",
       "Add Memory",
       "Add a memory entry to a scope.",
-      Type.Object({
-        scope: StringEnum(MEMORY_SCOPES),
-        scopeId: Type.Optional(Type.String()),
-        content: Type.String(),
-        kind: Type.Optional(StringEnum(MEMORY_KINDS)),
-      }),
+      Type.Object({ scope: StringEnum(MEMORY_SCOPES), scopeId: Type.Optional(Type.String()), content: Type.String(), kind: Type.Optional(StringEnum(MEMORY_KINDS)) }),
       (params) => {
-        const entry = studio.memory.add(params.scope, params.content, {
-          scopeId: params.scopeId,
-          kind: params.kind,
-        });
+        const entry = studio.memory.add(params.scope, params.content, { scopeId: params.scopeId, kind: params.kind });
         return { text: `Added memory ${entry.id}`, details: { entry } };
       },
     ),
-  );
-
-  pi.registerTool(
     tool(
       "studio_record_decision",
       "Record Decision",
       "Record a durable decision in a scope.",
-      Type.Object({
-        scope: StringEnum(MEMORY_SCOPES),
-        scopeId: Type.Optional(Type.String()),
-        content: Type.String(),
-        alternatives: Type.Optional(Type.Array(Type.String())),
-        owner: Type.Optional(Type.String()),
-      }),
+      Type.Object({ scope: StringEnum(MEMORY_SCOPES), scopeId: Type.Optional(Type.String()), content: Type.String(), alternatives: Type.Optional(Type.Array(Type.String())), owner: Type.Optional(Type.String()) }),
       (params) => {
         const entry = studio.memory.recordDecision(params.scope, params.content, {
           scopeId: params.scopeId,
@@ -469,71 +408,59 @@ export function registerStudioTools(pi: ExtensionAPI, studio: Studio): void {
   );
 
   // Goals
-  pi.registerTool(
-    tool(
-      "studio_get_goal",
-      "Get Goal",
-      "Get a single goal by id.",
-      Type.Object({ id: Type.String() }),
-      (params) => {
-        const goal = studio.goal.get(params.id);
-        if (!goal) return { text: `Goal not found: ${params.id}`, details: { id: params.id } };
-        return { text: `${goal.id}  [${goal.status}] ${goal.title}`, details: { goal } };
-      },
-    ),
-  );
-
-  pi.registerTool(
+  defs.push(
+    tool("studio_get_goal", "Get Goal", "Get a single goal by id.", Type.Object({ id: Type.String() }), (params) => {
+      const goal = studio.goal.get(params.id);
+      if (!goal) return { text: `Goal not found: ${params.id}`, details: { id: params.id } };
+      return { text: `${goal.id}  [${goal.status}] ${goal.title}`, details: { goal } };
+    }),
     tool(
       "studio_create_goal",
       "Create Goal",
       "Create a goal, optionally under an organization, project, or parent goal.",
-      Type.Object({
-        title: Type.String(),
-        organizationId: Type.Optional(Type.String()),
-        projectId: Type.Optional(Type.String()),
-        parentId: Type.Optional(Type.String()),
-      }),
+      Type.Object({ title: Type.String(), organizationId: Type.Optional(Type.String()), projectId: Type.Optional(Type.String()), parentId: Type.Optional(Type.String()) }),
       (params) => {
-        const goal = studio.goal.create(params.title, {
-          organizationId: params.organizationId,
-          projectId: params.projectId,
-          parentId: params.parentId,
-        });
+        const goal = studio.goal.create(params.title, { organizationId: params.organizationId, projectId: params.projectId, parentId: params.parentId });
         return { text: `Created goal ${goal.id} "${goal.title}"`, details: { goal } };
       },
     ),
-  );
-
-  // Status + escalation
-  pi.registerTool(
     tool(
-      "studio_get_agent_status",
-      "Get Agent Status",
-      "Get an agent's current state and current task.",
-      Type.Object({ id: Type.String() }),
+      "studio_list_goals",
+      "List Goals",
+      "List goals, optionally scoped to an organization or project.",
+      Type.Object({ organizationId: Type.Optional(Type.String()), projectId: Type.Optional(Type.String()) }),
       (params) => {
-        const agent = studio.agents.get(params.id);
-        if (!agent) return { text: `Agent not found: ${params.id}`, details: { id: params.id } };
-        const task = agent.currentTaskId ? studio.tasks.get(agent.currentTaskId) : undefined;
-        const text = `${agent.id}  ${agent.name}  state=${agent.state}  role=${agent.roleName}  currentTask=${agent.currentTaskId ?? "(none)"}`;
-        return { text, details: { agent, currentTask: task } };
+        const goals = studio.goal.list({ organizationId: params.organizationId, projectId: params.projectId });
+        const text = goals.length === 0 ? "(no goals)" : goals.map((g) => `${g.id}  [${g.status}] ${g.title}`).join("\n");
+        return { text, details: { goals } };
+      },
+    ),
+    tool(
+      "studio_set_goal_status",
+      "Set Goal Status",
+      "Update a goal's status.",
+      Type.Object({ id: Type.String(), status: StringEnum(GOAL_STATUSES) }),
+      (params) => {
+        studio.goal.setStatus(params.id, params.status);
+        return { text: `Goal ${params.id} -> ${params.status}`, details: { id: params.id, status: params.status } };
       },
     ),
   );
 
-  pi.registerTool(
+  // Status + escalation + verdict
+  defs.push(
+    tool("studio_get_agent_status", "Get Agent Status", "Get an agent's current state and current task.", Type.Object({ id: Type.String() }), (params) => {
+      const agent = studio.agents.get(params.id);
+      if (!agent) return { text: `Agent not found: ${params.id}`, details: { id: params.id } };
+      const task = agent.currentTaskId ? studio.tasks.get(agent.currentTaskId) : undefined;
+      const text = `${agent.id}  ${agent.name}  state=${agent.state}  role=${agent.roleName}  currentTask=${agent.currentTaskId ?? "(none)"}`;
+      return { text, details: { agent, currentTask: task } };
+    }),
     tool(
       "studio_escalate_to_human",
       "Escalate To Human",
       "Create a human escalation for a decision or blocker.",
-      Type.Object({
-        problem: Type.String(),
-        projectId: Type.Optional(Type.String()),
-        taskId: Type.Optional(Type.String()),
-        options: Type.Optional(Type.Array(Type.String())),
-        recommendation: Type.Optional(Type.String()),
-      }),
+      Type.Object({ problem: Type.String(), projectId: Type.Optional(Type.String()), taskId: Type.Optional(Type.String()), options: Type.Optional(Type.Array(Type.String())), recommendation: Type.Optional(Type.String()) }),
       (params) => {
         const escalation = createEscalation({
           problem: params.problem,
@@ -545,22 +472,32 @@ export function registerStudioTools(pi: ExtensionAPI, studio: Studio): void {
         return { text: `Escalation ${escalation.id} created: ${escalation.problem}`, details: { escalation } };
       },
     ),
-  );
-
-  pi.registerTool(
+    tool("studio_list_escalations", "List Escalations", "List human escalations, optionally filtered by status.", Type.Object({ status: Type.Optional(StringEnum(ESCALATION_STATUSES)) }), (params) => {
+      const escalations = studio.repo.listEscalations(params.status);
+      const text = escalations.length === 0 ? "(no escalations)" : escalations.map((e) => `${e.id}  [${e.status}] ${e.problem}`).join("\n");
+      return { text, details: { escalations } };
+    }),
     tool(
-      "studio_list_escalations",
-      "List Escalations",
-      "List human escalations, optionally filtered by status.",
-      Type.Object({ status: Type.Optional(StringEnum(ESCALATION_STATUSES)) }),
+      "studio_report_verdict",
+      "Report Verdict",
+      "Record a review/QA verdict for a task. Reviewers use approve/request_changes; QA uses pass/fail.",
+      Type.Object({ taskId: Type.String(), verdict: StringEnum(VERDICTS), comments: Type.Optional(Type.String()) }),
       (params) => {
-        const escalations = studio.repo.listEscalations(params.status);
-        const text =
-          escalations.length === 0
-            ? "(no escalations)"
-            : escalations.map((e) => `${e.id}  [${e.status}] ${e.problem}`).join("\n");
-        return { text, details: { escalations } };
+        const entry = studio.memory.add("task", JSON.stringify({ verdict: params.verdict, comments: params.comments }), {
+          scopeId: params.taskId,
+          kind: "review",
+          source: "verdict",
+        });
+        return { text: `Recorded verdict ${params.verdict} for task ${params.taskId}`, details: { entry } };
       },
     ),
   );
+
+  return defs;
+}
+
+export function registerStudioTools(pi: ExtensionAPI, studio: Studio): void {
+  for (const definition of createStudioToolDefinitions(studio)) {
+    pi.registerTool(definition);
+  }
 }

@@ -8,6 +8,7 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { StudioEvents } from "../../core/events.ts";
 import { defaultDbPath } from "../../database/db.ts";
+import { ProjectRunner, type ReviewPolicy } from "../../core/orchestration/index.ts";
 import { currentOrgId } from "../state.ts";
 import type { Studio } from "../state.ts";
 import { formatAgents, formatTasks } from "../ui/index.ts";
@@ -17,6 +18,7 @@ type Handler = (rest: string[], ctx: ExtensionCommandContext) => Promise<string>
 const HELP = [
   "usage: /studio <subcommand> [args]",
   "",
+  "  run                           guided wizard: plan + run a job autonomously",
   "  status                        org/project/agent/task counts + paused flag",
   "  setup                         wizard: create org + seed default policies",
   "  org [create <name> | use <id>]",
@@ -38,6 +40,64 @@ const HELP = [
 
 export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
   const handlers: Record<string, Handler> = {
+    async run(_rest, ctx): Promise<string> {
+      if (!ctx.hasUI) return "run requires an interactive UI";
+
+      const goal = await ctx.ui.input("What should we build?", "e.g. a command-line calculator with tests");
+      if (!goal || goal.trim() === "") return "run cancelled";
+      const goalText = goal.trim();
+
+      const defaultName =
+        goalText
+          .split(/\s+/)
+          .slice(0, 4)
+          .join("-")
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, "")
+          .slice(0, 40) || "project";
+      const projectName = (await ctx.ui.input("Project name:", defaultName))?.trim() || defaultName;
+
+      const policyChoice = await ctx.ui.select("Approval policy:", [
+        "review_and_tests_required (recommended)",
+        "fully_autonomous",
+        "review_required",
+        "manual_merge",
+      ]);
+      const reviewPolicy: ReviewPolicy =
+        policyChoice === "fully_autonomous"
+          ? "fully_autonomous"
+          : policyChoice === "review_required"
+            ? "review_required"
+            : policyChoice === "manual_merge"
+              ? "manual_merge"
+              : "review_and_tests_required";
+
+      let orgId = currentOrgId(studio);
+      if (!orgId) {
+        const org = studio.organization.create("Default Organization");
+        studio.policy.seedDefaults(org.id);
+        studio.repo.setSettingJson("currentOrgId", org.id);
+        orgId = org.id;
+      }
+
+      const project = studio.project.create(orgId, projectName);
+      studio.goal.create(goalText, { organizationId: orgId, projectId: project.id });
+
+      const runner = new ProjectRunner(studio.repo, studio.bus, studio.spawner);
+      ctx.ui.notify(`Planning "${goalText}"…`, "info");
+      const tasks = await runner.plan(project.id, goalText);
+      ctx.ui.notify(`Planned ${tasks.length} task(s). Running…`, "info");
+
+      const summary = await runner.runProject({
+        projectId: project.id,
+        reviewPolicy,
+        paused: () => studio.paused,
+        onProgress: (m) => ctx.ui.notify(m, "info"),
+      });
+
+      return `Done. Project "${project.name}" (${project.id}): ${summary.completed} completed, ${summary.failed} failed, ${summary.cancelled} cancelled (${summary.iterations} iterations).`;
+    },
+
     async status(): Promise<string> {
       const orgs = studio.organization.list().length;
       const projects = studio.project.list().length;
@@ -331,7 +391,7 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
     description: "Pi Studio: multi-agent software-development organization control",
     handler: async (args, ctx) => {
       const tokens = args.trim().split(/\s+/).filter(Boolean);
-      const sub = tokens[0] ?? "help";
+      const sub = tokens[0] ?? "run";
       const rest = tokens.slice(1);
       const handler = handlers[sub] ?? handlers.help;
       try {

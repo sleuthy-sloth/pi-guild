@@ -29,6 +29,9 @@ import {
   Scheduler,
 } from "../core/orchestration/index.ts";
 import { seedRoles } from "../agents/roles.ts";
+import { createStudioToolDefinitions } from "./tools/index.ts";
+
+export { currentOrgId } from "./currentOrg.ts";
 
 export interface Studio {
   db: Db;
@@ -70,7 +73,6 @@ export function getStudio(): Studio {
   const messaging = new MessagingService(repo, bus);
   const scheduler = new Scheduler(repo, bus);
   const router = new ModelRouter(repo);
-  const spawner = new AgentSpawner(repo, bus, createPiRunner({ repo, router }));
 
   const studio: Studio = {
     db,
@@ -86,9 +88,20 @@ export function getStudio(): Studio {
     messaging,
     scheduler,
     router,
-    spawner,
+    // Assigned below so the spawner's customTools closure can reference `studio`.
+    spawner: null as unknown as AgentSpawner,
     paused: false,
   };
+
+  studio.spawner = new AgentSpawner(
+    repo,
+    bus,
+    createPiRunner({
+      repo,
+      router,
+      customTools: () => createStudioToolDefinitions(studio),
+    }),
+  );
 
   // Idempotent lazy seeding: roles (skips existing) and default policies for
   // any organization that has none yet.
@@ -111,14 +124,4 @@ export function resetStudio(): void {
     // Already closed or otherwise unavailable — nothing to do.
   }
   memo = undefined;
-}
-
-/**
- * Resolve the "current" organization: the persisted `currentOrgId` setting when
- * it still points at a live org, otherwise the first organization (if any).
- */
-export function currentOrgId(studio: Studio): string | undefined {
-  const configured = studio.repo.getSettingJson<string>("currentOrgId", "");
-  if (configured && studio.repo.getOrganization(configured)) return configured;
-  return studio.repo.listOrganizations()[0]?.id;
 }

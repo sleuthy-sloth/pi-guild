@@ -1,4 +1,4 @@
-import type { Agent, Task, TaskState } from "../types.ts";
+import type { Agent, AgentState, Task, TaskState } from "../types.ts";
 import type { StudioRepository } from "../repository.ts";
 import { StudioEvents } from "../events.ts";
 import type { EventBus } from "../events.ts";
@@ -32,6 +32,18 @@ export interface AgentRunResult {
 /** Internal key under which the spawner threads an AbortSignal to runners. */
 export const ABORT_SIGNAL_KEY = "__piStudioAbortSignal";
 
+/** Per-run transition control (review/QA flows override the defaults). */
+export interface RunTransitionOptions {
+  /** Task state on success. Default "DONE". */
+  onSuccess?: TaskState;
+  /** Task state on failure. Default FAILED (treated as terminal for the attempt). */
+  onFailure?: TaskState;
+  /** Agent state on success. Default "IDLE". */
+  successAgentState?: AgentState;
+  /** Agent state on failure. Default "FAILED". */
+  failureAgentState?: AgentState;
+}
+
 const ACTOR = "system";
 
 // The task state machine (core/types.ts) has no FAILED terminal state, but the
@@ -52,7 +64,8 @@ export class AgentSpawner {
     this.agents = new AgentRegistryService(repo, bus);
   }
 
-  async run(agent: Agent, task: Task): Promise<AgentRunResult> {
+  async run(agent: Agent, task: Task, opts: RunTransitionOptions = {}): Promise<AgentRunResult> {
+    const { onSuccess = "DONE", onFailure = TASK_FAILED, successAgentState = "IDLE", failureAgentState = "FAILED" } = opts;
     const startedAt = Date.now();
 
     this.agents.setState(agent.id, "STARTING");
@@ -87,16 +100,25 @@ export class AgentSpawner {
     const finalTask = this.repo.getTask(task.id) ?? task;
 
     if (result.ok) {
-      // setState("DONE") emits task.completed + task.state_changed.
-      this.tasks.setState(task.id, "DONE");
-      this.agents.setState(agent.id, "IDLE");
+      // setState emits task.completed / task.state_changed for the chosen state.
+      this.tasks.setState(task.id, onSuccess);
+      this.agents.setState(agent.id, successAgentState);
       this.agents.setCurrentTask(agent.id, undefined);
     } else {
-      // setState(TASK_FAILED) emits task.failed + task.state_changed.
-      this.tasks.setState(task.id, TASK_FAILED);
-      this.agents.setState(agent.id, "FAILED");
+      this.tasks.setState(task.id, onFailure);
+      this.agents.setState(agent.id, failureAgentState);
       this.agents.setCurrentTask(agent.id, undefined);
     }
+
+    // Record the attempt as task-scoped memory (feeds context assembly later).
+    this.repo.addMemory({
+      scope: "task",
+      scopeId: task.id,
+      kind: "attempt",
+      content: result.ok ? (result.summary ?? "completed") : (result.error ?? "failed"),
+      source: agent.roleName,
+      author: agent.name,
+    });
 
     this.repo.recordUsage({
       organizationId: finalAgent.organizationId,

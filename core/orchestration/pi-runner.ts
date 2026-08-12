@@ -19,10 +19,10 @@ import type { ModelRouter } from "./model-router.ts";
  * createPiRunner — the real runtime adapter (spec §20, §54).
  *
  * Each `run()` spins up an in-process AgentSession via Pi's SDK with a project
- * workspace cwd, a role-derived system prompt, and the model the ModelRouter
- * resolved for that role (falling back to the session default when the router
- * only yields a model class or nothing at all). Nothing is started at import
- * time; sessions are created lazily inside `run()` and disposed in a `finally`.
+ * workspace cwd, a role-derived system prompt, the model the ModelRouter
+ * resolved for that role (falling back to the session default), and the shared
+ * studio tool surface as `customTools`. Nothing is started at import time;
+ * sessions are created lazily inside `run()` and disposed in a `finally`.
  */
 
 // The compat catalog getter is tightly typed against the generated catalog; we
@@ -56,7 +56,7 @@ function buildSystemPrompt(role: AgentRole | undefined, agent: Agent): string {
   return lines.join("\n");
 }
 
-function buildTaskPrompt(task: Task): string {
+function buildTaskPrompt(task: Task, roleName?: string): string {
   const lines: string[] = [];
   lines.push(`# Task: ${task.title}`);
   lines.push(`Task ID: ${task.id}`);
@@ -76,8 +76,27 @@ function buildTaskPrompt(task: Task): string {
     lines.push("");
     lines.push(`Labels: ${task.labels.join(", ")}`);
   }
+
   lines.push("");
-  lines.push("Complete the task and report a concise summary of what changed and how it was verified.");
+  switch (roleName) {
+    case "Manager":
+      lines.push(
+        "Record the plan by creating tasks with studio_create_task (or studio_decompose_task) and wiring order with studio_add_task_dependency. Then summarize the plan.",
+      );
+      break;
+    case "Reviewer":
+      lines.push(
+        'Review the work against the acceptance criteria, then end by calling studio_report_verdict with verdict "approve" or "request_changes" and your comments.',
+      );
+      break;
+    case "QA":
+      lines.push(
+        'Test the work, then end by calling studio_report_verdict with verdict "pass" or "fail" and your findings.',
+      );
+      break;
+    default:
+      lines.push("Complete the task and report a concise summary of what changed and how it was verified.");
+  }
   return lines.join("\n");
 }
 
@@ -85,13 +104,12 @@ export interface CreatePiRunnerOptions {
   repo: StudioRepository;
   router: ModelRouter;
   workspaceDir?: string;
-  customTools?: unknown[];
+  customTools?: ToolDefinition[] | (() => ToolDefinition[]);
 }
 
 export function createPiRunner(opts: CreatePiRunnerOptions): AgentRunner {
   const { repo, router } = opts;
   const workspaceRoot = opts.workspaceDir;
-  const customTools = opts.customTools as ToolDefinition[] | undefined;
 
   return {
     async run(agent: Agent, task: Task): Promise<AgentRunResult> {
@@ -118,12 +136,22 @@ export function createPiRunner(opts: CreatePiRunnerOptions): AgentRunner {
       });
       await resourceLoader.reload();
 
+      const tools = typeof opts.customTools === "function" ? opts.customTools() : opts.customTools;
+
       const { session } = await createAgentSession({
         cwd,
         model,
         sessionManager: SessionManager.inMemory(cwd),
         resourceLoader,
-        customTools,
+        customTools: tools,
+      });
+
+      // Capture the agent's final answer as the run summary (streamed deltas).
+      let finalText = "";
+      const unsubscribe = session.subscribe((event) => {
+        if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
+          finalText += event.assistantMessageEvent.delta;
+        }
       });
 
       const signal = agent.settings[ABORT_SIGNAL_KEY] as AbortSignal | undefined;
@@ -131,17 +159,18 @@ export function createPiRunner(opts: CreatePiRunnerOptions): AgentRunner {
       if (signal) signal.addEventListener("abort", onAbort);
 
       try {
-        await session.prompt(buildTaskPrompt(task));
+        await session.prompt(buildTaskPrompt(task, agent.roleName));
         const stats = session.getSessionStats();
         return {
           ok: true,
-          summary: "Task completed by the agent session.",
+          summary: finalText.trim().slice(0, 4000) || "Task completed by the agent session.",
           promptTokens: stats.tokens.input,
           completionTokens: stats.tokens.output,
         };
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err) };
       } finally {
+        unsubscribe();
         if (signal) signal.removeEventListener("abort", onAbort);
         session.dispose();
       }

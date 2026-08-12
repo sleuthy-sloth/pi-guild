@@ -59,7 +59,7 @@ export type AgentKind = "persistent" | "ephemeral" | "scheduled" | "event";
 /** Scope of a memory entry (spec §26). */
 export type MemoryScope = "global" | "organization" | "project" | "task" | "agent";
 
-export type MemoryKind = "note" | "decision" | "fact" | "attempt";
+export type MemoryKind = "note" | "decision" | "fact" | "attempt" | "review";
 
 export type GoalKind = "company" | "product" | "feature" | "task";
 

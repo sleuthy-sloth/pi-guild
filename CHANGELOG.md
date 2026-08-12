@@ -4,6 +4,36 @@ All notable changes to Pi Studio are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - unreleased
+
+### Added
+
+- **Guided autonomous run**: bare `/studio` (or `/studio run`) is an interactive
+  wizard that asks what to build and the approval policy, then plans and runs
+  the whole team itself — manager decomposition, developer execution, review,
+  and QA — through to `DONE`.
+- **ProjectRunner** (`core/orchestration/runner.ts`): the autonomous execution
+  loop (dev → review → QA), with reuse-or-spawn agent pooling, verdict-driven
+  review/QA via `studio_report_verdict`, pause/abort, and a deterministic
+  plan fallback.
+- **New tools**: `studio_decompose_task`, `studio_add_task_dependency`,
+  `studio_list_task_dependencies`, `studio_list_goals`, `studio_set_goal_status`,
+  `studio_report_verdict`, and `parentId` on `studio_create_task`.
+- **Shared tool surface**: `createStudioToolDefinitions` feeds both the
+  extension and spawned agent sessions, so agents can self-organize with the
+  same tools the user sees.
+- **Role-aware scheduling** and configurable review policy
+  (`manual_merge`, `review_required`, `review_and_tests_required`,
+  `fully_autonomous`).
+- **Attempt memory**: every agent run is recorded as task-scoped memory.
+
+### Changed
+
+- `AgentSpawner.run` accepts per-run success/failure transitions.
+- `Scheduler.tick` accepts a `roleName` filter.
+- Role data files (manager/reviewer/QA) updated to drive the new verdict and
+  decomposition tools.
+
 ## [0.1.0] - unreleased
 
 ### Added

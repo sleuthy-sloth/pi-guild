@@ -149,6 +149,10 @@ availability, budget/concurrency limits, project policy. Output: which
   via `/studio start`), `event` (spawned on a matching `EventBus` event).
 - **Managers don't poll.** Completion of a task emits `task.completed`, which
   wakes any agent `WAITING` on that task or on review (spec §15).
+- **`ProjectRunner`** (spec §60) sits on top of the scheduler: it reuses-or-spawns
+  role agents, drives each task through developer → review → QA → done according
+  to the project's review policy, reads review verdicts from task memory, and
+  honors pause/abort. The `/studio` wizard drives it end-to-end.
 
 ---
 

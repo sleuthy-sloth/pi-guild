@@ -6,6 +6,9 @@
     "ls",
     "studio_list_tasks",
     "studio_create_task",
+    "studio_decompose_task",
+    "studio_add_task_dependency",
+    "studio_list_task_dependencies",
     "studio_assign_task",
     "studio_list_agents",
     "studio_send_message"
