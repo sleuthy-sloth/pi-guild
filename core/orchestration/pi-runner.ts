@@ -1,6 +1,8 @@
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { loadSkillContents, roleSkills } from "../skills.ts";
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -36,7 +38,7 @@ function defaultWorkspaceDir(projectId: string): string {
   return join(homedir(), ".pi", "agent", "pi-studio", "workspaces", projectId);
 }
 
-function buildSystemPrompt(role: AgentRole | undefined, agent: Agent): string {
+function buildSystemPrompt(role: AgentRole | undefined, agent: Agent, skillsText?: string): string {
   const lines: string[] = [];
   lines.push(`You are ${agent.name}, a Pi Studio agent acting in the "${agent.roleName}" role.`);
   if (role?.systemPrompt) {
@@ -52,6 +54,11 @@ function buildSystemPrompt(role: AgentRole | undefined, agent: Agent): string {
     lines.push("");
     lines.push("Permissions:");
     for (const p of role.permissions) lines.push(`- ${p}`);
+  }
+  if (skillsText) {
+    lines.push("");
+    lines.push("## Skills");
+    lines.push(skillsText);
   }
   return lines.join("\n");
 }
@@ -105,6 +112,8 @@ export interface CreatePiRunnerOptions {
   router: ModelRouter;
   workspaceDir?: string;
   customTools?: ToolDefinition[] | (() => ToolDefinition[]);
+  /** Package root (defaults to the repo root two levels up from this file). */
+  packageRoot?: string;
 }
 
 export function createPiRunner(opts: CreatePiRunnerOptions): AgentRunner {
@@ -118,6 +127,12 @@ export function createPiRunner(opts: CreatePiRunnerOptions): AgentRunner {
 
       const role = repo.getRoleByName(agent.roleName);
 
+      const root = opts.packageRoot ?? fileURLToPath(new URL("../../", import.meta.url));
+      const skillsText = loadSkillContents(
+        join(root, "skills"),
+        roleSkills(join(root, "agents"), agent.roleName),
+      );
+
       let model: Model<any> | undefined;
       const resolved = router.resolve(agent.roleName);
       if (resolved?.model && resolved.provider) {
@@ -127,7 +142,7 @@ export function createPiRunner(opts: CreatePiRunnerOptions): AgentRunner {
       const resourceLoader = new DefaultResourceLoader({
         cwd,
         agentDir: getAgentDir(),
-        systemPrompt: buildSystemPrompt(role, agent),
+        systemPrompt: buildSystemPrompt(role, agent, skillsText),
         noExtensions: true,
         noSkills: true,
         noPromptTemplates: true,

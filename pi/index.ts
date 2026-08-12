@@ -11,11 +11,12 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getStudio, resetStudio } from "./state.ts";
 import { registerStudioCommand } from "./commands/index.ts";
 import { registerStudioTools, STUDIO_TOOL_NAMES } from "./tools/index.ts";
+import { formatLive } from "./ui/index.ts";
 
 let wired = false;
 
 export default function (pi: ExtensionAPI) {
-  pi.on("session_start", () => {
+  pi.on("session_start", (_event, ctx) => {
     const studio = getStudio();
 
     if (!wired) {
@@ -26,6 +27,8 @@ export default function (pi: ExtensionAPI) {
 
     const active = pi.getActiveTools();
     pi.setActiveTools([...new Set([...active, ...STUDIO_TOOL_NAMES])]);
+
+    if (ctx.hasUI) ctx.ui.setWidget("studio-live", formatLive(studio).split("\n"));
   });
 
   pi.on("session_shutdown", () => {

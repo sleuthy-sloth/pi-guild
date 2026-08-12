@@ -11,7 +11,7 @@ import { defaultDbPath } from "../../database/db.ts";
 import { ProjectRunner, type ReviewPolicy } from "../../core/orchestration/index.ts";
 import { currentOrgId } from "../state.ts";
 import type { Studio } from "../state.ts";
-import { formatAgents, formatTasks } from "../ui/index.ts";
+import { formatAgents, formatLive, formatTasks } from "../ui/index.ts";
 
 type Handler = (rest: string[], ctx: ExtensionCommandContext) => Promise<string>;
 
@@ -19,6 +19,9 @@ const HELP = [
   "usage: /studio <subcommand> [args]",
   "",
   "  run                           guided wizard: plan + run a job autonomously",
+  "  council [question | members | add <provider>/<model>]",
+  "  bg [<role> <prompt>]           fire-and-forget background job",
+  "  live                          refresh the live agent panel",
   "  status                        org/project/agent/task counts + paused flag",
   "  setup                         wizard: create org + seed default policies",
   "  org [create <name> | use <id>]",
@@ -39,6 +42,19 @@ const HELP = [
 ].join("\n");
 
 export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
+  function refreshLive(ctx: ExtensionCommandContext): void {
+    if (ctx.hasUI) ctx.ui.setWidget("studio-live", formatLive(studio).split("\n"));
+  }
+
+  async function deliberateCouncil(question: string, ctx: ExtensionCommandContext): Promise<string> {
+    ctx.ui.notify("Consulting the council…", "info");
+    const result = await studio.council.deliberate(question);
+    if (!result.consensus) {
+      return "No council models configured. Use /studio council add <provider>/<model>.";
+    }
+    return `Consensus: ${result.consensus}`;
+  }
+
   const handlers: Record<string, Handler> = {
     async run(_rest, ctx): Promise<string> {
       if (!ctx.hasUI) return "run requires an interactive UI";
@@ -87,15 +103,93 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
       ctx.ui.notify(`Planning "${goalText}"…`, "info");
       const tasks = await runner.plan(project.id, goalText);
       ctx.ui.notify(`Planned ${tasks.length} task(s). Running…`, "info");
+      refreshLive(ctx);
 
       const summary = await runner.runProject({
         projectId: project.id,
         reviewPolicy,
         paused: () => studio.paused,
-        onProgress: (m) => ctx.ui.notify(m, "info"),
+        onProgress: (m) => {
+          ctx.ui.notify(m, "info");
+          refreshLive(ctx);
+        },
       });
+      refreshLive(ctx);
 
       return `Done. Project "${project.name}" (${project.id}): ${summary.completed} completed, ${summary.failed} failed, ${summary.cancelled} cancelled (${summary.iterations} iterations).`;
+    },
+
+    async live(_rest, ctx): Promise<string> {
+      refreshLive(ctx);
+      return formatLive(studio);
+    },
+
+    async council(rest, ctx): Promise<string> {
+      if (rest[0] === "members") {
+        const members = studio.council.members();
+        return members.length === 0
+          ? "(no council models — use /studio council add <provider>/<model>)"
+          : members.map((m) => `${m.provider}/${m.model}`).join("\n");
+      }
+      if (rest[0] === "add") {
+        const [provider, model] = (rest[1] ?? "").split("/");
+        if (!provider || !model) return "usage: /studio council add <provider>/<model>";
+        studio.council.addMember({ provider, model });
+        return `Council: ${studio.council.members().map((m) => `${m.provider}/${m.model}`).join(", ") || "(none)"}`;
+      }
+      if (rest[0] === "reset") {
+        studio.council.setMembers([]);
+        return "Council cleared.";
+      }
+      const question = rest.join(" ").trim();
+      if (!question) {
+        if (!ctx.hasUI) return "usage: /studio council <question>";
+        const q = await ctx.ui.input("Question for the council:", "Which library should we use?");
+        if (!q || !q.trim()) return "council cancelled";
+        return deliberateCouncil(q.trim(), ctx);
+      }
+      return deliberateCouncil(question, ctx);
+    },
+
+    async bg(rest): Promise<string> {
+      if (rest.length === 0) {
+        const running = studio.agents.list().filter((a) => a.state === "WORKING" || a.state === "STARTING");
+        return running.length === 0
+          ? "(no background jobs running)"
+          : running.map((a) => `${a.id}  ${a.name}  [${a.state}] ${a.roleName}`).join("\n");
+      }
+      const role = rest[0];
+      const prompt = rest.slice(1).join(" ").trim();
+      if (!prompt) return "usage: /studio bg <role> <prompt>";
+
+      const orgId = currentOrgId(studio);
+      if (!orgId) return "No current organization — run /studio setup.";
+      const roles = studio.repo.listRoles();
+      const roleDef = roles.find((r) => r.name.toLowerCase() === role.toLowerCase());
+      if (!roleDef) return `Unknown role "${role}". Available: ${roles.map((r) => r.name).join(", ") || "none"}`;
+
+      let project = studio.project.list(orgId)[0];
+      if (!project) project = studio.project.create(orgId, "Inbox");
+
+      const agent = studio.agents.create({
+        name: `${roleDef.name.toLowerCase()}-bg-${Date.now().toString(36).slice(-4)}`,
+        roleName: roleDef.name,
+        roleId: roleDef.id,
+        organizationId: orgId,
+        projectId: project.id,
+        state: "IDLE",
+        kind: "ephemeral",
+      });
+      const task = studio.tasks.create({
+        title: `${roleDef.name}: ${prompt}`,
+        description: prompt,
+        projectId: project.id,
+        labels: ["background"],
+      });
+
+      // Fire-and-forget: the spawner records the attempt + result to task memory.
+      void studio.spawner.run(agent, task).catch(() => {});
+      return `Started background ${roleDef.name} job — task ${task.id} (agent ${agent.id}).`;
     },
 
     async status(): Promise<string> {

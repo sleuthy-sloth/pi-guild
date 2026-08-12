@@ -173,12 +173,27 @@ export class ProjectRunner {
         break;
       }
 
-      // 1. Developer work
+      // 1a. Design work (tasks labeled "design")
+      if (this.scheduler.readyTasks(projectId, { label: "design" }).length > 0) {
+        this.ensureAgent(projectId, "Designer");
+      }
+      const design = this.scheduler.tick(projectId, { roleName: "Designer", label: "design" });
+      if (design.length > 0) {
+        report(`Running ${design.length} design task(s)`);
+        await Promise.all(
+          design.map(({ task, agent }) =>
+            this.spawner.run(agent, task, { onSuccess: needsReview ? "REVIEW" : "DONE" }),
+          ),
+        );
+        continue;
+      }
+
+      // 1b. Developer work (everything else)
       if (this.scheduler.readyTasks(projectId).length > 0) {
         // Guarantee at least one worker exists; ensureAgent reuses an idle one.
         this.ensureAgent(projectId, "Developer");
       }
-      const dev = this.scheduler.tick(projectId, { roleName: "Developer" });
+      const dev = this.scheduler.tick(projectId, { roleName: "Developer", excludeLabel: "design" });
       if (dev.length > 0) {
         report(`Running ${dev.length} developer task(s)`);
         await Promise.all(

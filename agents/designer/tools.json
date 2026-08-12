@@ -1,0 +1,14 @@
+{
+  "tools": [
+    "read",
+    "grep",
+    "find",
+    "ls",
+    "edit",
+    "write",
+    "studio_list_tasks",
+    "studio_get_task",
+    "studio_update_task",
+    "studio_send_message"
+  ]
+}

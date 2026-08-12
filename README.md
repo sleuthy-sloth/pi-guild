@@ -143,6 +143,9 @@ All commands live under the `/studio` namespace:
 | Command | Purpose |
 |---------|---------|
 | `/studio` / `run` | guided wizard: plan + run a job autonomously |
+| `/studio council [question]` / `members` / `add <provider>/<model>` | multi-model synthesis |
+| `/studio bg <role> <prompt>` | fire-and-forget background job |
+| `/studio live` | refresh the live agent panel |
 | `/studio setup` | wizard: create DB, seed roles + default policies |
 | `/studio status` | org/project/agent/task counts + pause flag |
 | `/studio org` / `org create <name>` / `org use <id>` | list / create / select organizations |
@@ -178,6 +181,8 @@ Seven data-driven roles ship in `agents/` (each with `role.md`, `policy.json`,
 | **Reviewer** | review code against acceptance criteria | read + approve/request changes |
 | **QA** | write/run tests, report bugs, verify fixes | run tests, write tests, report bugs |
 | **Researcher** | investigate unknowns, produce sourced findings | read + search the web |
+| **Designer** | UI/UX: layout, typography, color, motion; produces working markup/styles | edit code, create branches |
+| **Librarian** | find authoritative answers from docs/GitHub/web, with sources | read-only + web search |
 
 Roles are **data-driven**: edit the files in `agents/<role>/` to change a role's
 tools, permissions, or system prompt without touching code. `seedRoles()` is
@@ -195,6 +200,34 @@ Git, GitHub, and Plane integrations are **later milestones** — not part of the
 The optional browser dashboard under `ui/` is also a **later milestone**.
 
 ---
+
+## Council (multi-model synthesis)
+
+Pi Studio can run one question through several models in parallel and synthesize
+a consensus — inspired by oh-my-opencode-slim's "Council". Configure the
+member list, then deliberate:
+
+```text
+/studio council add anthropic/claude-sonnet-4-5
+/studio council add openai/gpt-5
+/studio council "Which persistence layer should this project use?"
+```
+
+The same capability is available to agents as `studio_council`. Models are
+provider-agnostic — any model Pi can see works.
+
+## Skills
+
+Roles reference lightweight skills from the `skills/` directory (each a
+`SKILL.md`). Add `skills.json` to a role directory to inject those skills into
+that role's system prompt at run time. Two ship by default: `ui-design` and
+`web-research`. Add your own without touching code.
+
+## Live panel
+
+Pi Studio surfaces a live agent panel in the TUI (org/project/task counts plus
+the agent roster). It refreshes on session start, on `/studio live`, and during
+an autonomous run.
 
 ## Security model
 

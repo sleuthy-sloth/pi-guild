@@ -4,6 +4,27 @@ All notable changes to Pi Studio are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - unreleased
+
+### Added
+
+- **Designer + Librarian roles** — data-driven role definitions wired into the
+  seed + spawn paths; Designer routes "design"-labeled tasks in the autonomous
+  loop.
+- **Council (multi-model synthesis)** — `Council` service + real model responder
+  (`createCouncilResponder`), `studio_council` tool, and `/studio council`.
+- **Skills** — `skills/` SKILL.md files, a loader, and per-role `skills.json`
+  injected into the spawned session's system prompt.
+- **Background workers** — `/studio bg <role> <prompt>` fire-and-forget runs
+  with `/studio bg` to list in-flight jobs.
+- **Live agent panel** — `formatLive` TUI widget refreshed on session start,
+  `/studio live`, and during autonomous runs.
+
+### Changed
+
+- `Scheduler.tick`/`readyTasks` gain `label`/`excludeLabel` filters.
+- `ProjectRunner` routes design-labeled tasks to the Designer role.
+
 ## [0.2.0] - unreleased
 
 ### Added

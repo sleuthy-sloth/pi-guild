@@ -10,3 +10,5 @@ export {
 export { createPiRunner, type CreatePiRunnerOptions } from "./pi-runner.ts";
 export { ProjectRunner, type ReviewPolicy, type RunOptions, type RunSummary } from "./runner.ts";
 export type { RunTransitionOptions } from "./spawner.ts";
+export { Council, type CouncilMember, type CouncilResult, type CouncilResponder } from "./council.ts";
+export { createCouncilResponder } from "./council-runner.ts";

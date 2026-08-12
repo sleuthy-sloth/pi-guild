@@ -1,0 +1,11 @@
+{
+  "tools": [
+    "read",
+    "grep",
+    "find",
+    "ls",
+    "studio_list_tasks",
+    "studio_get_task",
+    "studio_send_message"
+  ]
+}

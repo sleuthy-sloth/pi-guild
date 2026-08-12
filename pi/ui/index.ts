@@ -4,6 +4,7 @@
  * No TUI component classes here — just aligned, human-readable text.
  */
 import type { Agent, Task } from "../../core/types.ts";
+import type { Studio } from "../state.ts";
 
 function column(value: string, width: number): string {
   return value.padEnd(width);
@@ -38,4 +39,22 @@ export function formatTasks(tasks: Task[]): string {
     return `${column(t.state, stateW)}  ${column(t.title, titleW)}  ${column(assignee, assigneeW)}  ${t.id}`;
   });
   return [header, ...rows].join("\n");
+}
+
+/** Live dashboard: org/project/task counts + the current agent roster. */
+export function formatLive(studio: Studio): string {
+  const tasks = studio.tasks.list();
+  const counts: Record<string, number> = {};
+  for (const t of tasks) counts[t.state] = (counts[t.state] ?? 0) + 1;
+  const taskSummary = Object.entries(counts)
+    .map(([state, n]) => `${state}=${n}`)
+    .join(" ") || "(none)";
+
+  return [
+    "Pi Studio — live",
+    `orgs=${studio.organization.list().length} projects=${studio.project.list().length} paused=${studio.paused}`,
+    `tasks: ${taskSummary}`,
+    "",
+    formatAgents(studio.agents.list()),
+  ].join("\n");
 }

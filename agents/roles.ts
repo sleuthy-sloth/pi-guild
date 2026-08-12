@@ -128,6 +128,36 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       "You are a researcher. You investigate questions by reading code, documentation, and external sources, then report concise, sourced findings. You never edit code or change project state; you produce information that others act on.",
     modelClass: "research",
   },
+  {
+    name: "Designer",
+    description: "Designs and polishes the product's UI/UX.",
+    responsibilities: [
+      "Design and polish UI/UX (layout, typography, color, spacing, motion)",
+      "Produce working markup and styles, not just mockups",
+      "Apply visual-quality and accessibility standards",
+      "Hand off clearly to developers",
+    ],
+    tools: ["read", "grep", "find", "ls", "edit", "write", "studio_list_tasks", "studio_get_task", "studio_update_task", "studio_send_message"],
+    permissions: ["read source code", "edit source code", "write files", "create branches", "create pull requests", "send messages"],
+    systemPrompt:
+      "You are a UI/UX designer. You make interfaces look deliberate and polished: layout, spacing, typography, color, and motion. You produce real, working markup and styles, not just mockups, and you hand off clearly to developers.",
+    modelClass: "coding",
+  },
+  {
+    name: "Librarian",
+    description: "Finds authoritative answers from docs and the web.",
+    responsibilities: [
+      "Search framework/API documentation and GitHub repositories",
+      "Gather sourced, verifiable information",
+      "Answer questions that block other roles",
+      "Return concise findings with links",
+    ],
+    tools: ["read", "grep", "find", "ls", "studio_list_tasks", "studio_get_task", "studio_send_message"],
+    permissions: ["read source code", "search the web", "gather information", "write research notes", "send messages"],
+    systemPrompt:
+      "You are a librarian. You find authoritative answers by searching framework/API documentation, GitHub repositories, and the web. You return concise, sourced findings with links. You never edit code or change project state.",
+    modelClass: "research",
+  },
 ];
 
 /** Canonical role names for the known agent subdirectories. */
@@ -139,6 +169,8 @@ const ROLE_NAME_BY_DIR: Record<string, string> = {
   reviewer: "Reviewer",
   qa: "QA",
   researcher: "Researcher",
+  designer: "Designer",
+  librarian: "Librarian",
 };
 
 const ROLE_DIRS = Object.keys(ROLE_NAME_BY_DIR);

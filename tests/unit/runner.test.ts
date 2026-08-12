@@ -166,4 +166,23 @@ describe("ProjectRunner.runProject", () => {
     expect(summary.cancelled).toBe(1);
     expect(summary.completed).toBe(0);
   });
+
+  it("routes design-labeled tasks to the Designer role", async () => {
+    const repo = newTestRepo();
+    seedRoles(repo);
+    const { proj } = setup(repo);
+    const designTask = repo.createTask({ title: "Polish the UI", projectId: proj.id, labels: ["design"] });
+
+    const summary = await runnerWith(repo, okRunner).runProject({
+      projectId: proj.id,
+      reviewPolicy: "fully_autonomous",
+    });
+
+    expect(summary.completed).toBe(1);
+    expect(repo.getTask(designTask.id)!.state).toBe("DONE");
+
+    const roles = repo.listAgents({ projectId: proj.id }).map((a) => a.roleName);
+    expect(roles).toContain("Designer");
+    expect(roles).not.toContain("Developer");
+  });
 });

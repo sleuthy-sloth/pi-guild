@@ -24,6 +24,8 @@ import { TaskService } from "../core/tasks/index.ts";
 import { MessagingService } from "../core/messaging/index.ts";
 import {
   AgentSpawner,
+  Council,
+  createCouncilResponder,
   createPiRunner,
   ModelRouter,
   Scheduler,
@@ -48,6 +50,7 @@ export interface Studio {
   scheduler: Scheduler;
   router: ModelRouter;
   spawner: AgentSpawner;
+  council: Council;
   paused: boolean;
 }
 
@@ -73,6 +76,7 @@ export function getStudio(): Studio {
   const messaging = new MessagingService(repo, bus);
   const scheduler = new Scheduler(repo, bus);
   const router = new ModelRouter(repo);
+  const council = new Council(repo, createCouncilResponder());
 
   const studio: Studio = {
     db,
@@ -90,6 +94,7 @@ export function getStudio(): Studio {
     router,
     // Assigned below so the spawner's customTools closure can reference `studio`.
     spawner: null as unknown as AgentSpawner,
+    council,
     paused: false,
   };
 

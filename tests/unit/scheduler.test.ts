@@ -102,4 +102,34 @@ describe("Scheduler", () => {
     expect(assignments).toHaveLength(1);
     expect(assignments[0].agent.roleName).toBe("Reviewer");
   });
+
+  it("filters ready tasks by label", () => {
+    const o = org();
+    const p = project(o.id);
+    idleAgent(o.id, p.id, "dev-1");
+    const design = repo.createTask({ title: "design", projectId: p.id, labels: ["design"] });
+    const normal = repo.createTask({ title: "normal", projectId: p.id });
+
+    const scheduler = new Scheduler(repo, undefined, { maxConcurrentAgents: 4 });
+    const assignments = scheduler.tick(p.id, { label: "design" });
+
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0].task.id).toBe(design.id);
+    expect(repo.getTask(normal.id)?.assigneeId).toBeNull();
+  });
+
+  it("excludes tasks by label", () => {
+    const o = org();
+    const p = project(o.id);
+    idleAgent(o.id, p.id, "dev-1");
+    const design = repo.createTask({ title: "design", projectId: p.id, labels: ["design"] });
+    const normal = repo.createTask({ title: "normal", projectId: p.id });
+
+    const scheduler = new Scheduler(repo, undefined, { maxConcurrentAgents: 4 });
+    const assignments = scheduler.tick(p.id, { excludeLabel: "design" });
+
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0].task.id).toBe(normal.id);
+    expect(repo.getTask(design.id)?.assigneeId).toBeNull();
+  });
 });

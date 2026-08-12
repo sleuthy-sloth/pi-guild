@@ -1,0 +1,4 @@
+{
+  "allow": ["read source code", "edit source code", "write files", "create branches", "create pull requests"],
+  "deny": ["merge into main", "deploy production", "delete repositories"]
+}

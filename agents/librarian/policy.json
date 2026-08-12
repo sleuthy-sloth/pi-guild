@@ -1,0 +1,4 @@
+{
+  "allow": ["read source code", "search the web", "gather information", "write research notes"],
+  "deny": ["edit source code", "write files", "merge into main", "deploy production"]
+}

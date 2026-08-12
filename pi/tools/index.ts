@@ -77,6 +77,7 @@ export const STUDIO_TOOL_NAMES = [
   "studio_escalate_to_human",
   "studio_list_escalations",
   "studio_report_verdict",
+  "studio_council",
 ] as const;
 
 function tool<T extends TSchema>(
@@ -84,7 +85,7 @@ function tool<T extends TSchema>(
   label: string,
   description: string,
   parameters: T,
-  run: (params: Static<T>) => ToolOutput,
+  run: (params: Static<T>) => ToolOutput | Promise<ToolOutput>,
 ): ToolDefinition<any, any> {
   return {
     name,
@@ -92,7 +93,7 @@ function tool<T extends TSchema>(
     description,
     parameters,
     async execute(_toolCallId, params, _signal, _onUpdate) {
-      const { text, details } = run(params as Static<T>);
+      const { text, details } = await run(params as Static<T>);
       return { content: [{ type: "text", text }], details };
     },
   };
@@ -447,7 +448,7 @@ export function createStudioToolDefinitions(studio: Studio): ToolDefinition[] {
     ),
   );
 
-  // Status + escalation + verdict
+  // Status + escalation + verdict + council
   defs.push(
     tool("studio_get_agent_status", "Get Agent Status", "Get an agent's current state and current task.", Type.Object({ id: Type.String() }), (params) => {
       const agent = studio.agents.get(params.id);
@@ -489,6 +490,19 @@ export function createStudioToolDefinitions(studio: Studio): ToolDefinition[] {
           source: "verdict",
         });
         return { text: `Recorded verdict ${params.verdict} for task ${params.taskId}`, details: { entry } };
+      },
+    ),
+    tool(
+      "studio_council",
+      "Council",
+      "Ask several configured models a question and synthesize a consensus answer.",
+      Type.Object({ question: Type.String() }),
+      async (params) => {
+        const result = await studio.council.deliberate(params.question);
+        const text =
+          result.consensus ||
+          "(no council models configured — set councilModels, e.g. /studio council add provider/model)";
+        return { text, details: { result } };
       },
     ),
   );

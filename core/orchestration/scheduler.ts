@@ -18,6 +18,15 @@ export interface SchedulerOptions {
   maxDepth?: number;
 }
 
+/** Filters for ready-task selection and agent pairing. */
+export interface TickFilter {
+  roleName?: string;
+  /** Only tasks carrying this label (case-insensitive). */
+  label?: string;
+  /** Exclude tasks carrying this label (case-insensitive). */
+  excludeLabel?: string;
+}
+
 const PRIORITY_ORDER: Record<Priority, number> = {
   CRITICAL: 0,
   HIGH: 1,
@@ -41,10 +50,12 @@ export class Scheduler {
   }
 
   /** BACKLOG/READY tasks whose dependencies are all DONE, priority-ordered. */
-  readyTasks(projectId?: string): Task[] {
+  readyTasks(projectId?: string, filter: { label?: string; excludeLabel?: string } = {}): Task[] {
+    const has = (t: Task, l: string) => t.labels.some((x) => x.toLowerCase() === l.toLowerCase());
     return this.repo
       .listTasks({ projectId })
       .filter((t) => (t.state === "BACKLOG" || t.state === "READY") && this.tasks.isReady(t.id))
+      .filter((t) => (!filter.label || has(t, filter.label)) && (!filter.excludeLabel || !has(t, filter.excludeLabel)))
       .sort((a, b) => {
         const pa = PRIORITY_ORDER[a.priority];
         const pb = PRIORITY_ORDER[b.priority];
@@ -66,13 +77,13 @@ export class Scheduler {
 
   /**
    * Pair ready tasks to available agents up to `maxConcurrentAgents`.
-   * Never pairs two tasks from the same project in one tick. When `roleName`
-   * is given, only agents of that role are considered.
+   * Never pairs two tasks from the same project in one tick. `roleName`
+   * restricts the agent pool; `label`/`excludeLabel` filter the task set.
    */
-  tick(projectId?: string, opts: { roleName?: string } = {}): Array<{ task: Task; agent: Agent }> {
+  tick(projectId?: string, opts: TickFilter = {}): Array<{ task: Task; agent: Agent }> {
     const assignments: Array<{ task: Task; agent: Agent }> = [];
     const usedProjectIds = new Set<string>();
-    const ready = this.readyTasks(projectId);
+    const ready = this.readyTasks(projectId, { label: opts.label, excludeLabel: opts.excludeLabel });
     const available = this.availableAgents(projectId, opts.roleName);
 
     for (const task of ready) {
