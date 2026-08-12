@@ -12,6 +12,7 @@ import { StudioEvents } from "../../core/events.ts";
 import { defaultDbPath } from "../../database/db.ts";
 import { ProjectRunner, RecoveryService, type ReviewPolicy } from "../../core/orchestration/index.ts";
 import { GitHubProvider, LocalGitProvider } from "../../integrations/git/index.ts";
+import { HttpPlaneClient, PlaneSyncService } from "../../integrations/plane/index.ts";
 import { currentOrgId } from "../state.ts";
 import type { Studio } from "../state.ts";
 import { formatAgents, formatLive, formatTasks } from "../ui/index.ts";
@@ -524,8 +525,36 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
       return "background scheduler not implemented yet";
     },
 
-    async plane(): Promise<string> {
-      return "not configured / later milestone";
+    async plane(rest): Promise<string> {
+      const [verb, ...args] = rest;
+      if (verb === "setup") {
+        const [baseUrl, workspaceSlug, apiKey] = args;
+        if (!baseUrl || !workspaceSlug || !apiKey) {
+          return "usage: /studio plane setup <baseUrl> <workspaceSlug> <apiKey>";
+        }
+        const sync = new PlaneSyncService(studio.repo, new HttpPlaneClient({ baseUrl, apiKey, workspaceSlug }));
+        sync.saveConfig({ baseUrl, apiKey, workspaceSlug });
+        return `Plane configured (${baseUrl}, workspace ${workspaceSlug}).`;
+      }
+      if (verb === "status") {
+        const config = PlaneSyncService.readConfig(studio.repo);
+        return config
+          ? `Plane configured: ${config.baseUrl} workspace=${config.workspaceSlug}`
+          : "Plane not configured. /studio plane setup <baseUrl> <workspaceSlug> <apiKey>";
+      }
+      if (verb === "sync") {
+        const config = PlaneSyncService.readConfig(studio.repo);
+        if (!config) return "Plane not configured. /studio plane setup <baseUrl> <workspaceSlug> <apiKey>";
+        const sync = new PlaneSyncService(studio.repo, new HttpPlaneClient(config));
+        const projectIds = args.length > 0 ? args : studio.project.list().map((p) => p.id);
+        const lines: string[] = [];
+        for (const projectId of projectIds) {
+          const result = await sync.pushProject(projectId);
+          lines.push(`project ${projectId}: ${result.created} created, ${result.updated} updated`);
+        }
+        return lines.join("\n");
+      }
+      return "usage: /studio plane setup|status|sync [projectId]";
     },
 
     async github(): Promise<string> {

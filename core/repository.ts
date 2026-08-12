@@ -1113,7 +1113,7 @@ export class StudioRepository {
   // Integrations
   // -------------------------------------------------------------------------
 
-  upsertIntegration(integration: Omit<Integration, "createdAt" | "updatedAt">): Integration {
+  upsertIntegration(integration: Omit<Integration, "id" | "createdAt" | "updatedAt">): Integration {
     const existing = this.db.prepare("SELECT id FROM integrations WHERE kind = ?").get(integration.kind) as
       | { id: string }
       | undefined;

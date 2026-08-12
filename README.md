@@ -207,8 +207,14 @@ protected-branch defaults and branch naming (`feature/<taskId>-<slug>`, `bugfix/
 ```
 
 Commits and pull requests are recorded in the local database; the reviewer's
-prompt includes the PR link. **Plane** and the optional browser dashboard remain
-**later milestones** (SQLite stays the source of truth regardless).
+prompt includes the PR link.
+
+### Plane
+
+An optional adapter mirrors project/task state into a Plane workspace
+(`/studio plane setup|status|sync`). SQLite stays the source of truth; Plane is
+a mirror. Assignees, labels, cycles, modules, comments, and webhook ingestion
+are follow-ups. The browser dashboard remains a later milestone.
 
 ---
 
@@ -239,6 +245,13 @@ that role's system prompt at run time. Two ship by default: `ui-design` and
 Pi Studio surfaces a live agent panel in the TUI (org/project/task counts plus
 the agent roster). It refreshes on session start, on `/studio live`, and during
 an autonomous run.
+
+## Context assembly
+
+Before a task runs, the context assembler gathers only what's relevant — the
+parent task, dependencies, project memory, decisions, prior attempts, and
+related messages — and injects it into the agent's prompt. Extensible via
+`ContextSource`.
 
 ## Recovery & budgets
 

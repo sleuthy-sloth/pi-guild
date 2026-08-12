@@ -16,6 +16,7 @@ import type { Agent, AgentRole, Task } from "../types.ts";
 import type { StudioRepository } from "../repository.ts";
 import { ABORT_SIGNAL_KEY, type AgentRunner, type AgentRunResult } from "./spawner.ts";
 import type { ModelRouter } from "./model-router.ts";
+import { ContextAssembler } from "../context/assembler.ts";
 
 /**
  * createPiRunner — the real runtime adapter (spec §20, §54).
@@ -182,7 +183,10 @@ export function createPiRunner(opts: CreatePiRunnerOptions): AgentRunner {
       if (signal) signal.addEventListener("abort", onAbort);
 
       try {
-        await session.prompt(buildTaskPrompt(task, agent.roleName));
+        const context = await new ContextAssembler(repo).assemble(task);
+        const prompt =
+          buildTaskPrompt(task, agent.roleName) + (context ? `\n\n## Context\n${context}` : "");
+        await session.prompt(prompt);
         const stats = session.getSessionStats();
         return {
           ok: true,
