@@ -240,6 +240,17 @@ Pi Studio surfaces a live agent panel in the TUI (org/project/task counts plus
 the agent roster). It refreshes on session start, on `/studio live`, and during
 an autonomous run.
 
+## Recovery & budgets
+
+Pi Studio reconciles on startup: agents left `WORKING`/`STARTING`/`REVIEWING`
+from a previous session are reset to `IDLE`, and interrupted `IN_PROGRESS` tasks
+are reopened to `READY` — work is never blindly resumed. Run `/studio recover`
+to reconcile manually.
+
+Per-organization budget limits are enforced during autonomous runs:
+`maxTokensPerTask`, `maxModelCallsPerTask`, and `maxAgentMinutes`, with `onLimit`
+of `continue`, `pause`, or `escalate` (see the Configuration table).
+
 ## Security model
 
 Agents in Pi Studio run with the **same full system permissions as Pi itself**:

@@ -84,7 +84,7 @@ describe("Scheduler", () => {
 
     expect(assignments).toHaveLength(1);
     expect(assignments[0].task.id).toBe(dep.id);
-    expect(repo.getTask(blocked.id)?.assigneeId).toBeNull();
+    expect(repo.getTask(blocked.id)?.assigneeId).toBeUndefined();
     expect(repo.getTask(blocked.id)?.state).toBe("BACKLOG");
   });
 
@@ -115,7 +115,7 @@ describe("Scheduler", () => {
 
     expect(assignments).toHaveLength(1);
     expect(assignments[0].task.id).toBe(design.id);
-    expect(repo.getTask(normal.id)?.assigneeId).toBeNull();
+    expect(repo.getTask(normal.id)?.assigneeId).toBeUndefined();
   });
 
   it("excludes tasks by label", () => {
@@ -130,6 +130,6 @@ describe("Scheduler", () => {
 
     expect(assignments).toHaveLength(1);
     expect(assignments[0].task.id).toBe(normal.id);
-    expect(repo.getTask(design.id)?.assigneeId).toBeNull();
+    expect(repo.getTask(design.id)?.assigneeId).toBeUndefined();
   });
 });

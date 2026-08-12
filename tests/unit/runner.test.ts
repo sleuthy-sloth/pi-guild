@@ -185,4 +185,25 @@ describe("ProjectRunner.runProject", () => {
     expect(roles).toContain("Designer");
     expect(roles).not.toContain("Developer");
   });
+
+  it("pauses when a task exceeds its token budget", async () => {
+    const repo = newTestRepo();
+    seedRoles(repo);
+    const org = repo.createOrganization({ name: "Demo", budgets: { maxTokensPerTask: 100, onLimit: "pause" } });
+    const proj = repo.createProject({ name: "calc", organizationId: org.id });
+    repo.createTask({ title: "Build it", projectId: proj.id });
+
+    const spendy: AgentRunner = {
+      async run() {
+        return { ok: true, summary: "done", promptTokens: 100, completionTokens: 50 };
+      },
+    };
+
+    const summary = await runnerWith(repo, spendy).runProject({
+      projectId: proj.id,
+      reviewPolicy: "fully_autonomous",
+    });
+
+    expect(summary.budgetPaused).toBe(true);
+  });
 });

@@ -47,6 +47,11 @@ function jparse<T>(s: string | null | undefined, fallback: T): T {
   }
 }
 
+/** Map SQL NULL to undefined so runtime values match the TS types. */
+function n<T>(v: unknown): T | undefined {
+  return v === null ? undefined : (v as T);
+}
+
 function now(): number {
   return Date.now();
 }
@@ -449,23 +454,23 @@ export class StudioRepository {
     return {
       id: r.id as string,
       name: r.name as string,
-      roleId: r.role_id as string | undefined,
+      roleId: n<string>(r.role_id),
       roleName: r.role_name as string,
-      model: r.model as string | undefined,
-      provider: r.provider as string | undefined,
-      projectId: r.project_id as string | undefined,
+      model: n<string>(r.model),
+      provider: n<string>(r.provider),
+      projectId: n<string>(r.project_id),
       organizationId: r.organization_id as string,
-      parentAgentId: r.parent_agent_id as string | undefined,
-      currentTaskId: r.current_task_id as string | undefined,
+      parentAgentId: n<string>(r.parent_agent_id),
+      currentTaskId: n<string>(r.current_task_id),
       state: r.state as AgentState,
-      sessionId: r.session_id as string | undefined,
-      sessionFile: r.session_file as string | undefined,
+      sessionId: n<string>(r.session_id),
+      sessionFile: n<string>(r.session_file),
       kind: r.kind as Agent["kind"],
-      schedule: r.schedule as string | undefined,
-      triggerEvent: r.trigger_event as string | undefined,
+      schedule: n<string>(r.schedule),
+      triggerEvent: n<string>(r.trigger_event),
       settings: jparse(r.settings as string, {}),
       createdAt: r.created_at as number,
-      lastActivityAt: r.last_activity_at as number | undefined,
+      lastActivityAt: n<number>(r.last_activity_at),
     };
   }
 
@@ -643,24 +648,24 @@ export class StudioRepository {
     return {
       id: r.id as string,
       title: r.title as string,
-      description: r.description as string | undefined,
+      description: n<string>(r.description),
       acceptanceCriteria: jparse(r.acceptance_criteria as string, [] as string[]),
       priority: r.priority as Priority,
-      assigneeId: r.assignee_id as string | undefined,
-      creatorId: r.creator_id as string | undefined,
+      assigneeId: n<string>(r.assignee_id),
+      creatorId: n<string>(r.creator_id),
       projectId: r.project_id as string,
-      parentId: r.parent_id as string | undefined,
+      parentId: n<string>(r.parent_id),
       labels: jparse(r.labels as string, [] as string[]),
       state: r.state as TaskState,
-      repository: r.repository as string | undefined,
-      branch: r.branch as string | undefined,
-      pr: r.pr as string | undefined,
+      repository: n<string>(r.repository),
+      branch: n<string>(r.branch),
+      pr: n<string>(r.pr),
       artifacts: jparse(r.artifacts as string, [] as string[]),
       depth: r.depth as number,
       createdAt: r.created_at as number,
       updatedAt: r.updated_at as number,
-      startedAt: r.started_at as number | undefined,
-      completedAt: r.completed_at as number | undefined,
+      startedAt: n<number>(r.started_at),
+      completedAt: n<number>(r.completed_at),
     };
   }
 
@@ -1406,6 +1411,26 @@ export class StudioRepository {
         input.elapsedMs,
         now(),
       );
+  }
+
+  /** Per-task usage, used for budget enforcement. */
+  taskUsage(taskId: string): {
+    modelCalls: number;
+    promptTokens: number;
+    completionTokens: number;
+    elapsedMs: number;
+  } {
+    const row = this.db
+      .prepare(
+        "SELECT COALESCE(SUM(model_calls),0) AS calls, COALESCE(SUM(prompt_tokens),0) AS pt, COALESCE(SUM(completion_tokens),0) AS ct, COALESCE(SUM(elapsed_ms),0) AS ms FROM usage_log WHERE task_id = ?",
+      )
+      .get(taskId) as { calls: number; pt: number; ct: number; ms: number };
+    return {
+      modelCalls: row.calls,
+      promptTokens: row.pt,
+      completionTokens: row.ct,
+      elapsedMs: row.ms,
+    };
   }
 
   usageStats(filter: { projectId?: string; organizationId?: string } = {}): {

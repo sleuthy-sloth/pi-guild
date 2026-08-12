@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { StudioEvents } from "../../core/events.ts";
 import { defaultDbPath } from "../../database/db.ts";
-import { ProjectRunner, type ReviewPolicy } from "../../core/orchestration/index.ts";
+import { ProjectRunner, RecoveryService, type ReviewPolicy } from "../../core/orchestration/index.ts";
 import { GitHubProvider, LocalGitProvider } from "../../integrations/git/index.ts";
 import { currentOrgId } from "../state.ts";
 import type { Studio } from "../state.ts";
@@ -39,6 +39,7 @@ const HELP = [
   "  doctor                        DB path, counts, integrations, settings",
   "  logs [N]                      last N audit entries",
   "  pause | resume                flip the scheduler pause flag",
+  "  recover                       reset orphaned agents/tasks (also runs on start)",
   "  stop <agentId> | stop project <id>",
   "  approve <id> | reject <id>    resolve a human escalation",
   "  escalate                      create a human escalation",
@@ -458,6 +459,11 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
     async pause(): Promise<string> {
       studio.paused = true;
       return "Scheduler paused.";
+    },
+
+    async recover(): Promise<string> {
+      const report = new RecoveryService(studio.repo).reconcile();
+      return `Recovery: reset ${report.agentsReset} agent(s), reopened ${report.tasksReopened} task(s).`;
     },
 
     async resume(): Promise<string> {

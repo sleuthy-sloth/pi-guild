@@ -28,6 +28,7 @@ import {
   createCouncilResponder,
   createPiRunner,
   ModelRouter,
+  RecoveryService,
   Scheduler,
 } from "../core/orchestration/index.ts";
 import { seedRoles } from "../agents/roles.ts";
@@ -120,6 +121,10 @@ export function getStudio(): Studio {
       policy.seedDefaults(org.id);
     }
   }
+
+  // Restart reconciliation: orphaned agents/tasks from a previous session are
+  // reset to a safe, re-assignable state (never blindly resumed).
+  new RecoveryService(repo).reconcile();
 
   memo = studio;
   return studio;

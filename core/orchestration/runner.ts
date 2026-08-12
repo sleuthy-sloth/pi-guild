@@ -15,6 +15,7 @@ import type { EventBus } from "../events.ts";
 import { TaskService } from "../tasks/index.ts";
 import { AgentRegistryService } from "../agents/index.ts";
 import { Scheduler } from "./scheduler.ts";
+import { BudgetService } from "./budget.ts";
 import type { AgentSpawner } from "./spawner.ts";
 
 export type ReviewPolicy =
@@ -36,6 +37,7 @@ export interface RunSummary {
   completed: number;
   failed: number;
   cancelled: number;
+  budgetPaused: boolean;
   iterations: number;
 }
 
@@ -46,6 +48,7 @@ export class ProjectRunner {
   private readonly tasks: TaskService;
   private readonly agents: AgentRegistryService;
   private readonly scheduler: Scheduler;
+  private readonly budget: BudgetService;
 
   constructor(
     private readonly repo: StudioRepository,
@@ -56,6 +59,7 @@ export class ProjectRunner {
     this.tasks = new TaskService(repo, bus);
     this.agents = new AgentRegistryService(repo, bus);
     this.scheduler = new Scheduler(repo, bus, { maxConcurrentAgents: opts.maxConcurrentAgents ?? 4 });
+    this.budget = new BudgetService(repo);
   }
 
   /** Reuse an idle agent of `roleName` in the project, or spawn one. */
@@ -144,6 +148,31 @@ export class ProjectRunner {
     this.repo.updateTask(taskId, { assigneeId: undefined });
   }
 
+  /** Apply the org's budget policy for a finished task. Returns "paused" to stop the loop. */
+  private enforceBudget(projectId: string, taskId: string, report: (m: string) => void): "ok" | "paused" {
+    const project = this.repo.getProject(projectId);
+    if (!project) return "ok";
+    const exceeded = this.budget.exceeded(taskId, project.organizationId);
+    if (exceeded.length === 0) return "ok";
+
+    const policy = this.budget.policy(project.organizationId);
+    const message = `Budget limit(s) exceeded for task ${taskId}: ${exceeded.join(", ")}`;
+    this.repo.recordEvent("budget.limit_reached", { taskId, projectId, exceeded, onLimit: policy.onLimit });
+    this.bus.emit("budget.limit_reached", { taskId, projectId, exceeded, onLimit: policy.onLimit });
+
+    if (policy.onLimit === "escalate") {
+      this.repo.createEscalation({ projectId, taskId, problem: message, options: ["continue", "pause", "increase budget"] });
+      report(`Escalated: ${message}`);
+      return "ok";
+    }
+    if (policy.onLimit === "pause") {
+      report(`Paused: ${message}`);
+      return "paused";
+    }
+    report(`Budget: ${message}`);
+    return "ok";
+  }
+
   async runProject(opts: RunOptions): Promise<RunSummary> {
     const { projectId, reviewPolicy = "review_and_tests_required", onProgress, signal } = opts;
     const paused = opts.paused ?? (() => false);
@@ -152,6 +181,7 @@ export class ProjectRunner {
 
     let iterations = 0;
     let cancelled = 0;
+    let budgetPaused = false;
     const report = (m: string) => {
       onProgress?.(m);
       this.bus.emit("runner.progress", { projectId, message: m });
@@ -185,6 +215,10 @@ export class ProjectRunner {
             this.spawner.run(agent, task, { onSuccess: needsReview ? "REVIEW" : "DONE" }),
           ),
         );
+        for (const { task } of design) {
+          if (this.enforceBudget(projectId, task.id, report) === "paused") budgetPaused = true;
+        }
+        if (budgetPaused) break;
         continue;
       }
 
@@ -201,6 +235,10 @@ export class ProjectRunner {
             this.spawner.run(agent, task, { onSuccess: needsReview ? "REVIEW" : "DONE" }),
           ),
         );
+        for (const { task } of dev) {
+          if (this.enforceBudget(projectId, task.id, report) === "paused") budgetPaused = true;
+        }
+        if (budgetPaused) break;
         continue;
       }
 
@@ -220,7 +258,9 @@ export class ProjectRunner {
             });
             const verdict = this.newVerdict(task.id, beforeId) ?? (res.ok ? "approve" : "request_changes");
             if (verdict === "request_changes") this.reopen(task.id);
+            if (this.enforceBudget(projectId, task.id, report) === "paused") budgetPaused = true;
           }
+          if (budgetPaused) break;
           continue;
         }
       }
@@ -241,7 +281,9 @@ export class ProjectRunner {
             });
             const verdict = this.newVerdict(task.id, beforeId) ?? (res.ok ? "pass" : "fail");
             if (verdict === "fail") this.reopen(task.id);
+            if (this.enforceBudget(projectId, task.id, report) === "paused") budgetPaused = true;
           }
+          if (budgetPaused) break;
           continue;
         }
       }
@@ -268,6 +310,7 @@ export class ProjectRunner {
       completed: all.filter((t) => t.state === "DONE").length,
       failed: all.filter((t) => t.state === ("FAILED" as Task["state"])).length,
       cancelled,
+      budgetPaused,
       iterations,
     };
   }

@@ -12,3 +12,5 @@ export { ProjectRunner, type ReviewPolicy, type RunOptions, type RunSummary } fr
 export type { RunTransitionOptions } from "./spawner.ts";
 export { Council, type CouncilMember, type CouncilResult, type CouncilResponder } from "./council.ts";
 export { createCouncilResponder } from "./council-runner.ts";
+export { RecoveryService, type RecoveryReport } from "./recovery.ts";
+export { BudgetService } from "./budget.ts";
