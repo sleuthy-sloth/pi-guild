@@ -1,0 +1,14 @@
+{
+  "allow": [
+    "read source code",
+    "search the web",
+    "gather information",
+    "write research notes",
+    "send messages"
+  ],
+  "deny": [
+    "edit source code",
+    "run bash commands",
+    "merge into main"
+  ]
+}

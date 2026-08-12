@@ -1,0 +1,15 @@
+{
+  "allow": [
+    "read source code",
+    "view project state",
+    "define strategy",
+    "allocate budget",
+    "send messages"
+  ],
+  "deny": [
+    "edit source code",
+    "write files",
+    "run bash commands",
+    "merge into main"
+  ]
+}

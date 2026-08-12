@@ -1,0 +1,15 @@
+{
+  "allow": [
+    "read source code",
+    "run tests",
+    "write tests",
+    "report bugs",
+    "run bash commands",
+    "send messages"
+  ],
+  "deny": [
+    "merge into main",
+    "edit production code",
+    "delete protected branches"
+  ]
+}

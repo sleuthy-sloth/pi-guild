@@ -1,0 +1,36 @@
+{
+  "name": "pi-studio",
+  "version": "0.1.0",
+  "description": "Turn Pi into an autonomous multi-agent software-development organization. Native Pi runtime, local-first, SQLite persistence.",
+  "license": "MIT",
+  "type": "module",
+  "keywords": ["pi-package", "pi", "agents", "orchestration", "multi-agent", "autonomous"],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "pi": {
+    "extensions": ["./pi/index.ts"]
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.84.1",
+    "@earendil-works/pi-ai": "^0.84.1",
+    "@earendil-works/pi-tui": "^0.84.1",
+    "@types/node": "^22.10.0",
+    "typebox": "^1.3.7",
+    "typescript": "^5.6.0",
+    "tsx": "^4.19.0",
+    "vitest": "^3.0.0"
+  }
+}
