@@ -1,12 +1,12 @@
 /**
  * BackgroundScheduler — the explicitly started component (spec §54).
  *
- * `/studio start` spawns a bounded loop that continuously runs ready work
- * across all projects; `/studio stop` halts it. Nothing runs until started, and
+ * `/guild start` spawns a bounded loop that continuously runs ready work
+ * across all projects; `/guild stop` halts it. Nothing runs until started, and
  * it is torn down on `session_shutdown`. `tick()` is public so tests can drive
  * one pass without sleeping.
  */
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 import type { RunSummary } from "./runner.ts";
 
 const TERMINAL = new Set(["DONE", "CANCELLED", "FAILED"]);
@@ -24,7 +24,7 @@ export class BackgroundScheduler {
   private running = false;
 
   constructor(
-    private readonly repo: StudioRepository,
+    private readonly repo: GuildRepository,
     private readonly runProject: BackgroundRun,
     private readonly opts: BackgroundOptions = {},
   ) {}

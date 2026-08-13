@@ -9,14 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Renamed to Pi Guild** (formerly "Pi Studio"). Package is now `pi-guild`; the
-  data directory moved to `~/.pi/agent/pi-guild/`. The `/studio` command
-  namespace and `studio_*` tools keep their names.
+  data directory moved to `~/.pi/agent/pi-guild/`. The command namespace is now
+  `/guild` and the agent-facing tools are `guild_*` (the old `studio_*` names
+  no longer exist).
 
 ## [0.10.0] - unreleased
 
 ### Added
 
-- **Model routing UX** — `/studio models` (`list`, `providers`, `auto`,
+- **Model routing UX** — `/guild models` (`list`, `providers`, `auto`,
   `preset <provider>`, `set <role>`, `class <class>`, `clear`), and the setup
   wizard now offers auto-assign / choose-per-class / skip.
 - **Class-based assignment** — models are assigned per model class
@@ -41,9 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`LocalGitProvider.init`** makes an initial commit (so branching works on a
   fresh repo); **`push` skips silently when no remote exists** instead of
   failing the run.
-- **`/studio` wizard** auto-initializes a local repository in the project
+- **`/guild` wizard** auto-initializes a local repository in the project
   workspace (non-fatal if git is unavailable).
-- **`/studio setup`** is idempotent — re-running reuses the existing
+- **`/guild setup`** is idempotent — re-running reuses the existing
   organization instead of duplicating it.
 - Developer task prompt + role prompt note: commit locally; push/PR need a
   remote.
@@ -53,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Browser dashboard** (`core/dashboard/server.ts` + `ui/dashboard/index.html`) —
-  an optional, explicitly-started local web dashboard (`/studio dashboard`).
+  an optional, explicitly-started local web dashboard (`/guild dashboard`).
   Read-only snapshot of the SQLite DB (agents, tasks, escalations, PRs,
   messages, projects, usage) + pause/resume and approve/reject actions, served
   by Node's `http` with a self-contained dark UI and 2s auto-refresh.
@@ -62,19 +63,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Merge step** — `GitService.merge` + `studio_git_merge` + `/studio git merge`;
+- **Merge step** — `GitService.merge` + `guild_git_merge` + `/guild git merge`;
   the runner auto-merges PRs once tasks reach `DONE`, unless the review policy
   is `manual_merge`.
-- **Background scheduler loop** — `BackgroundScheduler` + `/studio start`/`stop`,
+- **Background scheduler loop** — `BackgroundScheduler` + `/guild start`/`stop`,
   torn down on `session_shutdown`.
-- **`/studio config`** — list / get / set / setjson of settings.
-- **`/studio usage`** — org + per-project token/call/time stats.
+- **`/guild config`** — list / get / set / setjson of settings.
+- **`/guild usage`** — org + per-project token/call/time stats.
 - **Notifications** — config-driven TUI notifications for blocked / escalation /
   review-needed / failed (`notifications` setting).
 - **GitHub adapter** — `GitHubClient` (PRs, CI runs, repo info via `gh`) +
-  `/studio github [projectId]`.
+  `/guild github [projectId]`.
 - **Plane comments** — push task messages as Plane issue comments
-  (`/studio plane comments <taskId>`).
+  (`/guild plane comments <taskId>`).
 
 ## [0.6.0] - unreleased
 
@@ -85,14 +86,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into the agent's task prompt; extensible via `ContextSource`.
 - **Plane adapter** (`integrations/plane/`) — `HttpPlaneClient` (fetch seam) +
   `PlaneSyncService` (project mapping, task→issue push, state mapping), with
-  `/studio plane setup|status|sync`. SQLite stays the source of truth.
+  `/guild plane setup|status|sync`. SQLite stays the source of truth.
 
 ## [0.5.0] - unreleased
 
 ### Added
 
 - **Recovery** (`core/orchestration/recovery.ts`) — on startup (and via
-  `/studio recover`), orphaned WORKING/STARTING/REVIEWING agents reset to IDLE
+  `/guild recover`), orphaned WORKING/STARTING/REVIEWING agents reset to IDLE
   and interrupted IN_PROGRESS tasks reopened to READY.
 - **Budget enforcement** (`core/orchestration/budget.ts`) —
   `maxTokensPerTask`, `maxModelCallsPerTask`, `maxAgentMinutes` with `onLimit`
@@ -114,9 +115,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of commits and PRs.
 - **RepositoryProvider abstraction** — `LocalGitProvider` (git CLI) and
   `GitHubProvider` (`gh` CLI), plus a testable `CommandRunner` seam.
-- **Git tools** — `studio_git_start/commit/push/pull_request/status`, wired into
+- **Git tools** — `guild_git_start/commit/push/pull_request/status`, wired into
   the Developer role.
-- **`/studio git` command** — setup (local/github), branch, commit, push, pr, log.
+- **`/guild git` command** — setup (local/github), branch, commit, push, pr, log.
 
 ### Changed
 
@@ -130,13 +131,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seed + spawn paths; Designer routes "design"-labeled tasks in the autonomous
   loop.
 - **Council (multi-model synthesis)** — `Council` service + real model responder
-  (`createCouncilResponder`), `studio_council` tool, and `/studio council`.
+  (`createCouncilResponder`), `guild_council` tool, and `/guild council`.
 - **Skills** — `skills/` SKILL.md files, a loader, and per-role `skills.json`
   injected into the spawned session's system prompt.
-- **Background workers** — `/studio bg <role> <prompt>` fire-and-forget runs
-  with `/studio bg` to list in-flight jobs.
+- **Background workers** — `/guild bg <role> <prompt>` fire-and-forget runs
+  with `/guild bg` to list in-flight jobs.
 - **Live agent panel** — `formatLive` TUI widget refreshed on session start,
-  `/studio live`, and during autonomous runs.
+  `/guild live`, and during autonomous runs.
 
 ### Changed
 
@@ -147,18 +148,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Guided autonomous run**: bare `/studio` (or `/studio run`) is an interactive
+- **Guided autonomous run**: bare `/guild` (or `/guild run`) is an interactive
   wizard that asks what to build and the approval policy, then plans and runs
   the whole team itself — manager decomposition, developer execution, review,
   and QA — through to `DONE`.
 - **ProjectRunner** (`core/orchestration/runner.ts`): the autonomous execution
   loop (dev → review → QA), with reuse-or-spawn agent pooling, verdict-driven
-  review/QA via `studio_report_verdict`, pause/abort, and a deterministic
+  review/QA via `guild_report_verdict`, pause/abort, and a deterministic
   plan fallback.
-- **New tools**: `studio_decompose_task`, `studio_add_task_dependency`,
-  `studio_list_task_dependencies`, `studio_list_goals`, `studio_set_goal_status`,
-  `studio_report_verdict`, and `parentId` on `studio_create_task`.
-- **Shared tool surface**: `createStudioToolDefinitions` feeds both the
+- **New tools**: `guild_decompose_task`, `guild_add_task_dependency`,
+  `guild_list_task_dependencies`, `guild_list_goals`, `guild_set_goal_status`,
+  `guild_report_verdict`, and `parentId` on `guild_create_task`.
+- **Shared tool surface**: `createGuildToolDefinitions` feeds both the
   extension and spawned agent sessions, so agents can self-organize with the
   same tools the user sees.
 - **Role-aware scheduling** and configurable review policy
@@ -181,12 +182,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   agent, task, and messaging domain services, each with audit + event
   recording.
 - **Persistence** (`database/`): SQLite schema + migrations and the
-  `StudioRepository` facade (no raw SQL outside the repository).
+  `GuildRepository` facade (no raw SQL outside the repository).
 - **Orchestration** (`core/orchestration/`): dependency-gated scheduler,
   agent/task lifecycle transition graph, model router, agent spawner, and the
   Pi runtime runner adapter.
 - **Event bus** (`core/events.ts`): in-process publish/subscribe with the
-  canonical `StudioEvents` name map and a shared `bus` singleton.
+  canonical `GuildEvents` name map and a shared `bus` singleton.
 - **Data-driven roles** (`agents/`): CEO, Manager, Architect, Developer,
   Reviewer, QA, and Researcher definitions with `seedRoles`.
 - **Policy engine** (`core/policies/`): allow/deny with deny-wins semantics,

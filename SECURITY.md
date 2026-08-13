@@ -36,9 +36,9 @@ can do at the OS level.
 
 - **Dangerous actions default to DENY** until explicitly allowed.
 - **No background daemon** starts from the extension factory; the scheduler loop
-  only runs after an explicit `/studio start`.
+  only runs after an explicit `/guild start`.
 - **Local-first**: state is stored in a local SQLite database
-  (`~/.pi/agent/pi-guild/studio.db`). Nothing is uploaded unless you enable an
+  (`~/.pi/agent/pi-guild/guild.db`). Nothing is uploaded unless you enable an
   integration.
 - **No secrets in the repo**: keys, tokens, and `.env` files must never be
   committed.

@@ -14,10 +14,10 @@ Thanks for your interest in Pi Guild. Keep contributions small and focused.
   imports, e.g. `import { bus } from "../events.ts"`.
 - **Node built-ins only** (`node:crypto`, `node:sqlite`, `node:fs`, `node:path`,
   `node:os`). No new npm dependencies without discussion.
-- **Data access goes through `StudioRepository`** (`core/repository.ts`). Never
+- **Data access goes through `GuildRepository`** (`core/repository.ts`). Never
   write raw SQL outside it.
 - **State changes follow the contract**: call the repo, `repo.audit(...)`,
-  `repo.recordEvent(...)`, and `bus.emit(...)` where a matching `StudioEvents`
+  `repo.recordEvent(...)`, and `bus.emit(...)` where a matching `GuildEvents`
   name exists.
 - **Tests**: add tests for new logic in `tests/`. Unit tests use an in-memory
   DB (`createDb(":memory:")`); the e2e test uses a mocked `AgentRunner` and

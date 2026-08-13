@@ -1,6 +1,6 @@
 import type { Message, MessageStatus, MessageType, NewMessage } from "../types.ts";
-import type { StudioRepository } from "../repository.ts";
-import { bus as defaultBus, StudioEvents } from "../events.ts";
+import type { GuildRepository } from "../repository.ts";
+import { bus as defaultBus, GuildEvents } from "../events.ts";
 import type { EventBus } from "../events.ts";
 
 export type { Message, MessageStatus, MessageType, NewMessage } from "../types.ts";
@@ -10,7 +10,7 @@ export type { Message, MessageStatus, MessageType, NewMessage } from "../types.t
  */
 export class MessagingService {
   constructor(
-    private readonly repo: StudioRepository,
+    private readonly repo: GuildRepository,
     private readonly bus: EventBus = defaultBus,
   ) {}
 
@@ -24,8 +24,8 @@ export class MessagingService {
       entityId: message.id,
       details: { recipientId: message.recipientId, messageType: message.messageType },
     });
-    this.repo.recordEvent(StudioEvents.messageSent, { messageId: message.id });
-    this.bus.emit(StudioEvents.messageSent, { messageId: message.id });
+    this.repo.recordEvent(GuildEvents.messageSent, { messageId: message.id });
+    this.bus.emit(GuildEvents.messageSent, { messageId: message.id });
     return message;
   }
 
@@ -53,8 +53,8 @@ export class MessagingService {
       entityId: message.id,
       details: { parentMessageId, recipientId: message.recipientId },
     });
-    this.repo.recordEvent(StudioEvents.messageSent, { messageId: message.id });
-    this.bus.emit(StudioEvents.messageSent, { messageId: message.id });
+    this.repo.recordEvent(GuildEvents.messageSent, { messageId: message.id });
+    this.bus.emit(GuildEvents.messageSent, { messageId: message.id });
     return message;
   }
 

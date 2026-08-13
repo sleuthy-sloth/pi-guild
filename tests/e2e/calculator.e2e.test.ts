@@ -10,7 +10,7 @@ import { AgentSpawner } from "../../core/orchestration/spawner.ts";
 import type { AgentRunner, AgentRunResult } from "../../core/orchestration/spawner.ts";
 import { OrganizationService } from "../../core/organization/index.ts";
 import { ProjectService } from "../../core/projects/index.ts";
-import { StudioRepository } from "../../core/repository.ts";
+import { GuildRepository } from "../../core/repository.ts";
 import { TaskService } from "../../core/tasks/index.ts";
 import type { Agent, Task } from "../../core/types.ts";
 import { createDb } from "../../database/db.ts";
@@ -19,7 +19,7 @@ const AGENTS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "ag
 
 describe("calculator end-to-end (mocked runtime)", () => {
   it("drives the full pipeline to completion with persistence", async () => {
-    const repo = new StudioRepository(createDb(":memory:"));
+    const repo = new GuildRepository(createDb(":memory:"));
     const bus = new EventBus();
     const orgs = new OrganizationService(repo, bus);
     const projects = new ProjectService(repo, bus);

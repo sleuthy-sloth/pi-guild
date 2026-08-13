@@ -5,9 +5,9 @@ import { AgentSpawner } from "../../core/orchestration/spawner.ts";
 import type { AgentRunner } from "../../core/orchestration/spawner.ts";
 import { ProjectRunner } from "../../core/orchestration/runner.ts";
 import { DEFAULT_ROLES } from "../../agents/roles.ts";
-import type { StudioRepository } from "../../core/repository.ts";
+import type { GuildRepository } from "../../core/repository.ts";
 
-function seedRoles(repo: StudioRepository): void {
+function seedRoles(repo: GuildRepository): void {
   for (const r of DEFAULT_ROLES) {
     if (!repo.getRoleByName(r.name)) {
       repo.createRole({
@@ -22,7 +22,7 @@ function seedRoles(repo: StudioRepository): void {
   }
 }
 
-function setup(repo: StudioRepository) {
+function setup(repo: GuildRepository) {
   const org = repo.createOrganization({ name: "Demo" });
   const proj = repo.createProject({ name: "calc", organizationId: org.id });
   return { org, proj };
@@ -34,7 +34,7 @@ const okRunner: AgentRunner = {
   },
 };
 
-function runnerWith(repo: StudioRepository, agentRunner: AgentRunner): ProjectRunner {
+function runnerWith(repo: GuildRepository, agentRunner: AgentRunner): ProjectRunner {
   return new ProjectRunner(repo, bus, new AgentSpawner(repo, bus, agentRunner));
 }
 

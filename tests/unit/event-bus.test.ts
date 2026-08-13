@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { EventBus } from "../../core/events.ts";
-import type { StudioEvent } from "../../core/types.ts";
+import type { GuildEvent } from "../../core/types.ts";
 
 describe("EventBus", () => {
   it("delivers events to on() handlers and unsubscribes via the returned off()", () => {
     const bus = new EventBus();
     const seen: Array<{ type: string; k: string }> = [];
-    const handler = (e: StudioEvent) => {
+    const handler = (e: GuildEvent) => {
       seen.push({ type: e.type, k: e.payload.k as string });
     };
 

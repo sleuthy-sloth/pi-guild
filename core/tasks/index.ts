@@ -1,6 +1,6 @@
 import type { NewTask, Task, TaskState } from "../types.ts";
-import type { StudioRepository } from "../repository.ts";
-import { bus as defaultBus, StudioEvents } from "../events.ts";
+import type { GuildRepository } from "../repository.ts";
+import { bus as defaultBus, GuildEvents } from "../events.ts";
 import type { EventBus } from "../events.ts";
 
 export type { NewTask, Task, TaskState } from "../types.ts";
@@ -16,7 +16,7 @@ const ACTOR = "system";
  */
 export class TaskService {
   constructor(
-    private readonly repo: StudioRepository,
+    private readonly repo: GuildRepository,
     private readonly bus: EventBus = defaultBus,
   ) {}
 
@@ -29,8 +29,8 @@ export class TaskService {
       entityId: task.id,
       details: { title: task.title, projectId: task.projectId, parentId: task.parentId, depth: task.depth },
     });
-    this.repo.recordEvent(StudioEvents.taskCreated, { taskId: task.id, task });
-    this.bus.emit(StudioEvents.taskCreated, { taskId: task.id, task });
+    this.repo.recordEvent(GuildEvents.taskCreated, { taskId: task.id, task });
+    this.bus.emit(GuildEvents.taskCreated, { taskId: task.id, task });
     return task;
   }
 
@@ -69,18 +69,18 @@ export class TaskService {
       entityId: id,
       details: { state, previous },
     });
-    this.repo.recordEvent(StudioEvents.taskStateChanged, { taskId: id, state, previous });
-    this.bus.emit(StudioEvents.taskStateChanged, { taskId: id, state, previous });
+    this.repo.recordEvent(GuildEvents.taskStateChanged, { taskId: id, state, previous });
+    this.bus.emit(GuildEvents.taskStateChanged, { taskId: id, state, previous });
 
     if (state === "DONE") {
-      this.repo.recordEvent(StudioEvents.taskCompleted, { taskId: id, state, previous });
-      this.bus.emit(StudioEvents.taskCompleted, { taskId: id, state, previous });
+      this.repo.recordEvent(GuildEvents.taskCompleted, { taskId: id, state, previous });
+      this.bus.emit(GuildEvents.taskCompleted, { taskId: id, state, previous });
     } else if (state === "BLOCKED") {
-      this.repo.recordEvent(StudioEvents.taskBlocked, { taskId: id, state, previous });
-      this.bus.emit(StudioEvents.taskBlocked, { taskId: id, state, previous });
+      this.repo.recordEvent(GuildEvents.taskBlocked, { taskId: id, state, previous });
+      this.bus.emit(GuildEvents.taskBlocked, { taskId: id, state, previous });
     } else if ((state as string) === "FAILED") {
-      this.repo.recordEvent(StudioEvents.taskFailed, { taskId: id, state, previous });
-      this.bus.emit(StudioEvents.taskFailed, { taskId: id, state, previous });
+      this.repo.recordEvent(GuildEvents.taskFailed, { taskId: id, state, previous });
+      this.bus.emit(GuildEvents.taskFailed, { taskId: id, state, previous });
     }
   }
 
@@ -93,8 +93,8 @@ export class TaskService {
       entityId: taskId,
       details: { agentId, state: "READY" },
     });
-    this.repo.recordEvent(StudioEvents.taskAssigned, { taskId, agentId });
-    this.bus.emit(StudioEvents.taskAssigned, { taskId, agentId });
+    this.repo.recordEvent(GuildEvents.taskAssigned, { taskId, agentId });
+    this.bus.emit(GuildEvents.taskAssigned, { taskId, agentId });
   }
 
   decompose(id: string, children: Array<{ title: string; description?: string }>, maxDepth: number = 4): Task[] {

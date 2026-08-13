@@ -151,7 +151,7 @@ export class GitHubProvider extends LocalGitProvider {
 /** Build the right provider for a persisted repository record. */
 export function buildProvider(repository: Repository): RepositoryProvider {
   if (!repository.path) {
-    throw new Error(`repository ${repository.id} has no local path — run /studio git setup`);
+    throw new Error(`repository ${repository.id} has no local path — run /guild git setup`);
   }
   if (repository.kind === "github") {
     return new GitHubProvider(repository.url ?? "", repository.path);

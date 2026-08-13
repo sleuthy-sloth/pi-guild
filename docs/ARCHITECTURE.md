@@ -1,6 +1,6 @@
 # Pi Guild — Architecture
 
-Public name: **Pi Guild** (formerly developed under the internal name "Pi Studio").
+Public name: **Pi Guild** (formerly developed under the internal name "Pi Guild").
 The package name is `pi-guild`.
 
 Pi Guild turns Pi into an autonomous software-development organization: a
@@ -42,9 +42,9 @@ Layering (spec §10):
 
 | Layer | Directory | Role |
 |-------|-----------|------|
-| Pi adapter | `pi/` | extension entry, `/studio` commands, `studio_*` tools, TUI |
+| Pi adapter | `pi/` | extension entry, `/guild` commands, `guild_*` tools, TUI |
 | Core engine | `core/` | domain logic, orchestration, scheduler, event bus |
-| Persistence | `database/` | SQLite schema, migrations, `StudioRepository` |
+| Persistence | `database/` | SQLite schema, migrations, `GuildRepository` |
 | Agent definitions | `agents/` | data-driven role files (role.md, policy.json, tools.json, prompt.md) |
 | Integrations | `integrations/` | git / github / plane adapters (all optional) |
 | UI | `ui/`, `pi/ui/` | TUI views + optional browser dashboard |
@@ -57,8 +57,8 @@ persistent manager processes; management runs in ephemeral sessions triggered
 by events (spec §15).
 
 **No background daemon** (spec §54). Nothing is started from the extension
-factory. Background scheduling, if enabled, is an explicit `/studio start`
-that spawns a bounded scheduler loop and is torn down on `/studio stop` and
+factory. Background scheduling, if enabled, is an explicit `/guild start`
+that spawns a bounded scheduler loop and is torn down on `/guild stop` and
 `session_shutdown` (spec §12).
 
 ---
@@ -78,7 +78,7 @@ Key design points:
 - **IDs** are UUIDs (`crypto.randomUUID`). **Timestamps** are epoch ms.
 - **Enums** stored as TEXT; the schema is permissive, the TS types are strict.
 - **JSON columns** (`goals`, `labels`, `acceptance_criteria`, `budgets`, …)
-  use `JSON.stringify` / `JSON.parse` through `StudioRepository`.
+  use `JSON.stringify` / `JSON.parse` through `GuildRepository`.
 - **Conversation history is not in the DB.** Agents store `session_id` /
   `session_file` pointing at Pi's session store (spec §9). Only durable
   *facts* (decisions, memory, task state, messages) live in SQLite.
@@ -93,8 +93,8 @@ Entry point `pi/index.ts` exports the default extension factory. It:
 
 1. Opens + migrates SQLite lazily (first command/tool that needs it), never
    during the factory.
-2. Registers `/studio` command namespace + direct aliases.
-3. Registers `studio_*` tools (TypeBox schemas) on first use.
+2. Registers `/guild` command namespace + direct aliases.
+3. Registers `guild_*` tools (TypeBox schemas) on first use.
 4. Subscribes to Pi events (`session_start` → restore in-memory state,
    `session_shutdown` → stop scheduler loop, close DB).
 5. Wires the shared `EventBus` to a Pi-notification adapter (`ctx.ui.notify`).
@@ -121,7 +121,7 @@ Transitions are explicit (`core/orchestration/lifecycle.ts`) and always emit a
 
 - Only the scheduler moves an agent into `STARTING`/`WORKING`.
 - A `WORKING` agent owns exactly one `AgentSession`; the scheduler `await`s it
-  or aborts it via `session.abort()` on `/studio stop`.
+  or aborts it via `session.abort()` on `/guild stop`.
 - `FAILED` is terminal for that attempt and records the error; retries are a
   scheduler decision, not automatic.
 - Agents are *registry records* + *transient sessions*. Stopping an agent
@@ -147,13 +147,13 @@ availability, budget/concurrency limits, project policy. Output: which
 - **Depth limits** cap task decomposition (spec §23, default max depth 4).
 - **Trigger modes** (spec §20): `persistent` (registered, idle until assigned),
   `ephemeral` (spawned for one task then discarded), `scheduled` (cron/interval
-  via `/studio start`), `event` (spawned on a matching `EventBus` event).
+  via `/guild start`), `event` (spawned on a matching `EventBus` event).
 - **Managers don't poll.** Completion of a task emits `task.completed`, which
   wakes any agent `WAITING` on that task or on review (spec §15).
 - **`ProjectRunner`** (spec §60) sits on top of the scheduler: it reuses-or-spawns
   role agents, drives each task through developer → review → QA → done according
   to the project's review policy, reads review verdicts from task memory, and
-  honors pause/abort. The `/studio` wizard drives it end-to-end.
+  honors pause/abort. The `/guild` wizard drives it end-to-end.
 
 ---
 
@@ -191,7 +191,7 @@ Plane, no GitHub, no web UI, no Docker.
 | 3 | Work domain | `core/agents`, `core/tasks`, `core/messaging` |
 | 4 | Orchestration | `core/orchestration` (scheduler, lifecycle, spawner, model router) |
 | 5 | Role definitions | `agents/{ceo,manager,architect,developer,reviewer,qa,researcher}` |
-| 6 | Pi extension | `pi/index.ts`, commands, `studio_*` tools, TUI |
+| 6 | Pi extension | `pi/index.ts`, commands, `guild_*` tools, TUI |
 | 7 | Tests | unit + mocked end-to-end (calculator project) |
 
 Milestones 2–5 (later): Git/PR workflow → Plane sync → GitHub adapter →

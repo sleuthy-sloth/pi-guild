@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryService } from "../../core/memory/index.ts";
-import { StudioRepository } from "../../core/repository.ts";
+import { GuildRepository } from "../../core/repository.ts";
 import { newTestRepo } from "../helpers.ts";
 
 describe("MemoryService", () => {
-  let repo: StudioRepository;
+  let repo: GuildRepository;
   let memory: MemoryService;
 
   beforeEach(() => {

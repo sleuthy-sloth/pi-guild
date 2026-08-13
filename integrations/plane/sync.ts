@@ -5,7 +5,7 @@
  * issue mappings are stored in the settings table (no schema change). State is
  * mapped from Pi Guild task states to Plane's default state names.
  */
-import type { StudioRepository } from "../../core/repository.ts";
+import type { GuildRepository } from "../../core/repository.ts";
 import type { TaskState } from "../../core/types.ts";
 import type { PlaneClient, PlaneConfig, PlaneProject } from "./client.ts";
 
@@ -13,11 +13,11 @@ const PLANE_CONFIG_KEY = "planeConfig";
 
 export class PlaneSyncService {
   constructor(
-    private readonly repo: StudioRepository,
+    private readonly repo: GuildRepository,
     private readonly client: PlaneClient,
   ) {}
 
-  static readConfig(repo: StudioRepository): PlaneConfig | undefined {
+  static readConfig(repo: GuildRepository): PlaneConfig | undefined {
     return repo.getSettingJson<PlaneConfig | undefined>(PLANE_CONFIG_KEY, undefined);
   }
 

@@ -7,10 +7,10 @@
  * or escalate.
  */
 import type { BudgetPolicy } from "../types.ts";
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 
 export class BudgetService {
-  constructor(private readonly repo: StudioRepository) {}
+  constructor(private readonly repo: GuildRepository) {}
 
   policy(organizationId: string): BudgetPolicy {
     return this.repo.getOrganization(organizationId)?.budgets ?? { onLimit: "continue" };

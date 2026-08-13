@@ -1,7 +1,7 @@
 import type { Goal, NewGoal } from "../types.ts";
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 import type { EventBus } from "../events.ts";
-import { bus as defaultBus, StudioEvents } from "../events.ts";
+import { bus as defaultBus, GuildEvents } from "../events.ts";
 
 const ACTOR = "system";
 const ENTITY = "goal";
@@ -9,7 +9,7 @@ const ENTITY = "goal";
 export class GoalService {
   private readonly bus: EventBus;
 
-  constructor(private readonly repo: StudioRepository, bus?: EventBus) {
+  constructor(private readonly repo: GuildRepository, bus?: EventBus) {
     this.bus = bus ?? defaultBus;
   }
 
@@ -23,8 +23,8 @@ export class GoalService {
       entityId: goal.id,
       details: { title: goal.title },
     });
-    this.repo.recordEvent(StudioEvents.goalCreated, { id: goal.id, title: goal.title });
-    this.bus.emit(StudioEvents.goalCreated, { id: goal.id, title: goal.title });
+    this.repo.recordEvent(GuildEvents.goalCreated, { id: goal.id, title: goal.title });
+    this.bus.emit(GuildEvents.goalCreated, { id: goal.id, title: goal.title });
     return goal;
   }
 

@@ -9,10 +9,10 @@ import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 
 export interface DashboardDeps {
-  repo: StudioRepository;
+  repo: GuildRepository;
   isPaused: () => boolean;
   pause: () => void;
   resume: () => void;
@@ -26,7 +26,7 @@ export interface DashboardServer {
   close(): Promise<void>;
 }
 
-export function buildState(repo: StudioRepository, paused: boolean) {
+export function buildState(repo: GuildRepository, paused: boolean) {
   const projects = repo.listProjects().map((p) => {
     const tasks = repo.listTasks({ projectId: p.id });
     return {

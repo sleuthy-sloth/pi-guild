@@ -4,8 +4,8 @@
     "grep",
     "find",
     "ls",
-    "studio_list_tasks",
-    "studio_get_task",
-    "studio_send_message"
+    "guild_list_tasks",
+    "guild_get_task",
+    "guild_send_message"
   ]
 }

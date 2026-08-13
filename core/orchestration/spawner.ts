@@ -1,6 +1,6 @@
 import type { Agent, AgentState, Task, TaskState } from "../types.ts";
-import type { StudioRepository } from "../repository.ts";
-import { StudioEvents } from "../events.ts";
+import type { GuildRepository } from "../repository.ts";
+import { GuildEvents } from "../events.ts";
 import type { EventBus } from "../events.ts";
 import { TaskService } from "../tasks/index.ts";
 import { AgentRegistryService } from "../agents/index.ts";
@@ -30,7 +30,7 @@ export interface AgentRunResult {
 }
 
 /** Internal key under which the spawner threads an AbortSignal to runners. */
-export const ABORT_SIGNAL_KEY = "__piStudioAbortSignal";
+export const ABORT_SIGNAL_KEY = "__piGuildAbortSignal";
 
 /** Per-run transition control (review/QA flows override the defaults). */
 export interface RunTransitionOptions {
@@ -56,7 +56,7 @@ export class AgentSpawner {
   private readonly agents: AgentRegistryService;
 
   constructor(
-    private readonly repo: StudioRepository,
+    private readonly repo: GuildRepository,
     private readonly bus: EventBus,
     private readonly runner: AgentRunner,
   ) {
@@ -69,15 +69,15 @@ export class AgentSpawner {
     const startedAt = Date.now();
 
     this.agents.setState(agent.id, "STARTING");
-    this.repo.recordEvent(StudioEvents.agentStarted, { agentId: agent.id, taskId: task.id });
-    this.bus.emit(StudioEvents.agentStarted, { agentId: agent.id, taskId: task.id });
+    this.repo.recordEvent(GuildEvents.agentStarted, { agentId: agent.id, taskId: task.id });
+    this.bus.emit(GuildEvents.agentStarted, { agentId: agent.id, taskId: task.id });
 
     this.agents.setState(agent.id, "WORKING");
     this.agents.setCurrentTask(agent.id, task.id);
 
     this.tasks.setState(task.id, "IN_PROGRESS");
-    this.repo.recordEvent(StudioEvents.taskStarted, { taskId: task.id, agentId: agent.id });
-    this.bus.emit(StudioEvents.taskStarted, { taskId: task.id, agentId: agent.id });
+    this.repo.recordEvent(GuildEvents.taskStarted, { taskId: task.id, agentId: agent.id });
+    this.bus.emit(GuildEvents.taskStarted, { taskId: task.id, agentId: agent.id });
 
     const controller = new AbortController();
     this.controllers.set(agent.id, controller);

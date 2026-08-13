@@ -4,12 +4,12 @@
  * Drives a project from READY tasks through developer work, review, and QA to
  * DONE without a human issuing per-step commands. Developers, reviewers, and QA
  * agents are reused when idle or spawned on demand. Verdicts are read from
- * task-scoped memory written by the `studio_report_verdict` tool, falling back
+ * task-scoped memory written by the `guild_report_verdict` tool, falling back
  * to the run's ok/fail when an agent does not record one.
  */
 import { randomUUID } from "node:crypto";
 import type { Agent, Task } from "../types.ts";
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 import { bus as defaultBus } from "../events.ts";
 import type { EventBus } from "../events.ts";
 import { TaskService } from "../tasks/index.ts";
@@ -29,7 +29,7 @@ export interface RunOptions {
   reviewPolicy?: ReviewPolicy;
   onProgress?: (message: string) => void;
   signal?: AbortSignal;
-  /** Consulted every pass; returns true while the user has paused the studio. */
+  /** Consulted every pass; returns true while the user has paused the guild. */
   paused?: () => boolean;
   /** Called to merge a task's PR once it reaches DONE (unless manual_merge). */
   merge?: (task: Task) => Promise<void>;
@@ -55,7 +55,7 @@ export class ProjectRunner {
   private readonly budget: BudgetService;
 
   constructor(
-    private readonly repo: StudioRepository,
+    private readonly repo: GuildRepository,
     private readonly bus: EventBus = defaultBus,
     private readonly spawner: AgentSpawner,
     opts: { maxConcurrentAgents?: number } = {},
@@ -91,7 +91,7 @@ export class ProjectRunner {
 
   /**
    * Decompose a goal into tasks. Primary path: a Manager agent records the plan
-   * by calling the studio task tools. Falls back to a deterministic three-task
+   * by calling the guild task tools. Falls back to a deterministic three-task
    * chain (implement → test → review) when the manager produces nothing.
    */
   async plan(projectId: string, goalText: string): Promise<Task[]> {

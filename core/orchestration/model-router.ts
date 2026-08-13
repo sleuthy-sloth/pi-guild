@@ -15,7 +15,7 @@
  * harness reports as available (logged-in), using a best-effort capability
  * heuristic. Everything is user-overridable afterwards.
  */
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 
 const ROLE_KEY = "modelRouter";
 const CLASS_KEY = "modelRouterClasses";
@@ -63,7 +63,7 @@ export function pickForClass(pool: AvailableModel[], cls: string): AvailableMode
 }
 
 export class ModelRouter {
-  constructor(private readonly repo: StudioRepository) {}
+  constructor(private readonly repo: GuildRepository) {}
 
   /** Model-CLASS labels by role. Never vendor names. */
   defaults(): Record<string, string> {

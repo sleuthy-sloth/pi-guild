@@ -3,10 +3,10 @@
  * Lives in its own module to avoid an import cycle (state.ts imports the tool
  * definitions, which import this).
  */
-import type { Studio } from "./state.ts";
+import type { Guild } from "./state.ts";
 
-export function currentOrgId(studio: Studio): string | undefined {
-  const configured = studio.repo.getSettingJson<string>("currentOrgId", "");
-  if (configured && studio.repo.getOrganization(configured)) return configured;
-  return studio.repo.listOrganizations()[0]?.id;
+export function currentOrgId(guild: Guild): string | undefined {
+  const configured = guild.repo.getSettingJson<string>("currentOrgId", "");
+  if (configured && guild.repo.getOrganization(configured)) return configured;
+  return guild.repo.listOrganizations()[0]?.id;
 }

@@ -1,5 +1,5 @@
 /**
- * `/studio` command namespace (spec §6, §54).
+ * `/guild` command namespace (spec §6, §54).
  *
  * A single registered command that parses `subcommand rest…` and dispatches to
  * small handlers. Each handler returns a string that is surfaced via
@@ -9,7 +9,7 @@ import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-c
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { StudioEvents } from "../../core/events.ts";
+import { GuildEvents } from "../../core/events.ts";
 import { defaultDbPath } from "../../database/db.ts";
 import { BackgroundScheduler, ProjectRunner, RecoveryService, type ReviewPolicy } from "../../core/orchestration/index.ts";
 import { GitHubProvider, LocalGitProvider } from "../../integrations/git/index.ts";
@@ -17,7 +17,7 @@ import { HttpPlaneClient, PlaneSyncService } from "../../integrations/plane/inde
 import { GitHubClient } from "../../integrations/github/index.ts";
 import { startDashboard } from "../../core/dashboard/server.ts";
 import { currentOrgId } from "../state.ts";
-import type { Studio } from "../state.ts";
+import type { Guild } from "../state.ts";
 import { formatAgents, formatLive, formatTasks } from "../ui/index.ts";
 
 type Handler = (rest: string[], ctx: ExtensionCommandContext) => Promise<string>;
@@ -53,7 +53,7 @@ function parseModelRef(ref: string): { provider: string; model: string } | undef
 }
 
 const HELP = [
-  "usage: /studio <subcommand> [args]",
+  "usage: /guild <subcommand> [args]",
   "",
   "  run                           guided wizard: plan + run a job autonomously",
   "  council [question | members | add <provider>/<model>]",
@@ -86,16 +86,16 @@ const HELP = [
   "  github [projectId]            PR / CI status via gh",
 ].join("\n");
 
-export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
+export function registerGuildCommand(pi: ExtensionAPI, guild: Guild): void {
   function refreshLive(ctx: ExtensionCommandContext): void {
-    if (ctx.hasUI) ctx.ui.setWidget("studio-live", formatLive(studio).split("\n"));
+    if (ctx.hasUI) ctx.ui.setWidget("guild-live", formatLive(guild).split("\n"));
   }
 
   async function deliberateCouncil(question: string, ctx: ExtensionCommandContext): Promise<string> {
     ctx.ui.notify("Consulting the council…", "info");
-    const result = await studio.council.deliberate(question);
+    const result = await guild.council.deliberate(question);
     if (!result.consensus) {
-      return "No council models configured. Use /studio council add <provider>/<model>.";
+      return "No council models configured. Use /guild council add <provider>/<model>.";
     }
     return `Consensus: ${result.consensus}`;
   }
@@ -133,19 +133,19 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
               ? "manual_merge"
               : "review_and_tests_required";
 
-      let orgId = currentOrgId(studio);
+      let orgId = currentOrgId(guild);
       if (!orgId) {
-        const org = studio.organization.create("Default Organization");
-        studio.policy.seedDefaults(org.id);
-        studio.repo.setSettingJson("currentOrgId", org.id);
+        const org = guild.organization.create("Default Organization");
+        guild.policy.seedDefaults(org.id);
+        guild.repo.setSettingJson("currentOrgId", org.id);
         orgId = org.id;
       }
 
-      const project = studio.project.create(orgId, projectName);
-      studio.goal.create(goalText, { organizationId: orgId, projectId: project.id });
+      const project = guild.project.create(orgId, projectName);
+      guild.goal.create(goalText, { organizationId: orgId, projectId: project.id });
 
       // Give the team a real local repo to work in (branch + commit work locally;
-      // push/PR need a remote configured later via /studio git setup). Non-fatal:
+      // push/PR need a remote configured later via /guild git setup). Non-fatal:
       // if git isn't available, the team still works in the workspace.
       try {
         const workspaceDir = join(homedir(), ".pi", "agent", "pi-guild", "workspaces", project.id);
@@ -156,12 +156,12 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
         );
         const gitProvider = new LocalGitProvider(workspaceDir);
         await gitProvider.init();
-        studio.git.register(project.id, { kind: "local", path: workspaceDir });
+        guild.git.register(project.id, { kind: "local", path: workspaceDir });
       } catch {
         ctx.ui.notify("Could not initialize a git repository — the team will work without one.", "warning");
       }
 
-      const runner = new ProjectRunner(studio.repo, studio.bus, studio.spawner);
+      const runner = new ProjectRunner(guild.repo, guild.bus, guild.spawner);
       ctx.ui.notify(`Planning "${goalText}"…`, "info");
       const tasks = await runner.plan(project.id, goalText);
       ctx.ui.notify(`Planned ${tasks.length} task(s). Running…`, "info");
@@ -170,8 +170,8 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
       const summary = await runner.runProject({
         projectId: project.id,
         reviewPolicy,
-        paused: () => studio.paused,
-        merge: (t) => studio.git.merge(t),
+        paused: () => guild.paused,
+        merge: (t) => guild.git.merge(t),
         autoMerge: reviewPolicy !== "manual_merge",
         onProgress: (m) => {
           ctx.ui.notify(m, "info");
@@ -185,100 +185,100 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
 
     async live(_rest, ctx): Promise<string> {
       refreshLive(ctx);
-      return formatLive(studio);
+      return formatLive(guild);
     },
 
     async git(rest): Promise<string> {
       const [verb, ...args] = rest;
       const requireTask = (id: string) => {
-        const task = studio.tasks.get(id);
+        const task = guild.tasks.get(id);
         if (!task) throw new Error(`task not found: ${id}`);
         return task;
       };
 
       if (verb === "setup") {
         const [projectId, kind, target] = args;
-        if (!projectId || !kind || !target) return "usage: /studio git setup <project> local <path> | github <url>";
-        const project = studio.project.get(projectId);
+        if (!projectId || !kind || !target) return "usage: /guild git setup <project> local <path> | github <url>";
+        const project = guild.project.get(projectId);
         if (!project) return `No project with id ${projectId}`;
         if (kind === "github") {
           const path = join(homedir(), ".pi", "agent", "pi-guild", "workspaces", projectId);
           const provider = new GitHubProvider(target, path);
           await provider.clone();
-          studio.git.register(projectId, { kind: "github", path, url: target });
+          guild.git.register(projectId, { kind: "github", path, url: target });
           return `Cloned ${target} → ${path} and registered as a GitHub repository.`;
         }
         if (kind === "local") {
           const provider = new LocalGitProvider(target);
           await provider.init();
-          studio.git.register(projectId, { kind: "local", path: target });
+          guild.git.register(projectId, { kind: "local", path: target });
           return `Initialized local repository at ${target}.`;
         }
-        return "usage: /studio git setup <project> local <path> | github <url>";
+        return "usage: /guild git setup <project> local <path> | github <url>";
       }
 
       if (verb === "branch") {
-        const branch = await studio.git.startBranch(requireTask(args[0]));
+        const branch = await guild.git.startBranch(requireTask(args[0]));
         return `Branch ${branch}`;
       }
       if (verb === "commit") {
         const task = requireTask(args[0]);
         const message = args.slice(1).join(" ").trim();
-        if (!message) return "usage: /studio git commit <taskId> <message>";
-        const commit = await studio.git.commit(task, message);
+        if (!message) return "usage: /guild git commit <taskId> <message>";
+        const commit = await guild.git.commit(task, message);
         return `Committed ${commit.sha ?? ""}`;
       }
       if (verb === "push") {
         const task = requireTask(args[0]);
-        await studio.git.push(task);
+        await guild.git.push(task);
         return `Pushed ${task.branch ?? "branch"}`;
       }
       if (verb === "pr") {
         const task = requireTask(args[0]);
-        const pr = await studio.git.openPullRequest(task);
+        const pr = await guild.git.openPullRequest(task);
         return `PR ${pr.url ?? pr.number}`;
       }
       if (verb === "merge") {
         const task = requireTask(args[0]);
-        await studio.git.merge(task);
+        await guild.git.merge(task);
         return `Merged ${task.branch ?? "branch"}`;
       }
       if (verb === "log") {
         const task = requireTask(args[0]);
-        const repository = studio.git.repositoryFor(task.projectId);
+        const repository = guild.git.repositoryFor(task.projectId);
         if (!repository) return "No repository configured for this task's project.";
-        const commits = studio.repo.listCommits(repository.id);
+        const commits = guild.repo.listCommits(repository.id);
         return commits.length === 0
           ? "(no commits)"
           : commits.map((c) => `${c.sha?.slice(0, 7) ?? ""}  ${c.branch ?? ""}  ${c.message}`).join("\n");
       }
 
-      const repos = studio.repo.listRepositories();
+      const repos = guild.repo.listRepositories();
       return repos.length === 0
-        ? "(no repositories — /studio git setup <project> local <path> | github <url>)"
+        ? "(no repositories — /guild git setup <project> local <path> | github <url>)"
         : repos.map((r) => `${r.id}  [${r.kind}] ${r.path ?? r.url}  (project ${r.projectId})`).join("\n");
     },
 
     async council(rest, ctx): Promise<string> {
       if (rest[0] === "members") {
-        const members = studio.council.members();
+        const members = guild.council.members();
         return members.length === 0
-          ? "(no council models — use /studio council add <provider>/<model>)"
+          ? "(no council models — use /guild council add <provider>/<model>)"
           : members.map((m) => `${m.provider}/${m.model}`).join("\n");
       }
       if (rest[0] === "add") {
         const [provider, model] = (rest[1] ?? "").split("/");
-        if (!provider || !model) return "usage: /studio council add <provider>/<model>";
-        studio.council.addMember({ provider, model });
-        return `Council: ${studio.council.members().map((m) => `${m.provider}/${m.model}`).join(", ") || "(none)"}`;
+        if (!provider || !model) return "usage: /guild council add <provider>/<model>";
+        guild.council.addMember({ provider, model });
+        return `Council: ${guild.council.members().map((m) => `${m.provider}/${m.model}`).join(", ") || "(none)"}`;
       }
       if (rest[0] === "reset") {
-        studio.council.setMembers([]);
+        guild.council.setMembers([]);
         return "Council cleared.";
       }
       const question = rest.join(" ").trim();
       if (!question) {
-        if (!ctx.hasUI) return "usage: /studio council <question>";
+        if (!ctx.hasUI) return "usage: /guild council <question>";
         const q = await ctx.ui.input("Question for the council:", "Which library should we use?");
         if (!q || !q.trim()) return "council cancelled";
         return deliberateCouncil(q.trim(), ctx);
@@ -288,25 +288,25 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
 
     async bg(rest): Promise<string> {
       if (rest.length === 0) {
-        const running = studio.agents.list().filter((a) => a.state === "WORKING" || a.state === "STARTING");
+        const running = guild.agents.list().filter((a) => a.state === "WORKING" || a.state === "STARTING");
         return running.length === 0
           ? "(no background jobs running)"
           : running.map((a) => `${a.id}  ${a.name}  [${a.state}] ${a.roleName}`).join("\n");
       }
       const role = rest[0];
       const prompt = rest.slice(1).join(" ").trim();
-      if (!prompt) return "usage: /studio bg <role> <prompt>";
+      if (!prompt) return "usage: /guild bg <role> <prompt>";
 
-      const orgId = currentOrgId(studio);
-      if (!orgId) return "No current organization — run /studio setup.";
-      const roles = studio.repo.listRoles();
+      const orgId = currentOrgId(guild);
+      if (!orgId) return "No current organization — run /guild setup.";
+      const roles = guild.repo.listRoles();
       const roleDef = roles.find((r) => r.name.toLowerCase() === role.toLowerCase());
       if (!roleDef) return `Unknown role "${role}". Available: ${roles.map((r) => r.name).join(", ") || "none"}`;
 
-      let project = studio.project.list(orgId)[0];
-      if (!project) project = studio.project.create(orgId, "Inbox");
+      let project = guild.project.list(orgId)[0];
+      if (!project) project = guild.project.create(orgId, "Inbox");
 
-      const agent = studio.agents.create({
+      const agent = guild.agents.create({
         name: `${roleDef.name.toLowerCase()}-bg-${Date.now().toString(36).slice(-4)}`,
         roleName: roleDef.name,
         roleId: roleDef.id,
@@ -315,7 +315,7 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
         state: "IDLE",
         kind: "ephemeral",
       });
-      const task = studio.tasks.create({
+      const task = guild.tasks.create({
         title: `${roleDef.name}: ${prompt}`,
         description: prompt,
         projectId: project.id,
@@ -323,41 +323,41 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
       });
 
       // Fire-and-forget: the spawner records the attempt + result to task memory.
-      void studio.spawner.run(agent, task).catch(() => {});
+      void guild.spawner.run(agent, task).catch(() => {});
       return `Started background ${roleDef.name} job — task ${task.id} (agent ${agent.id}).`;
     },
 
     async status(): Promise<string> {
-      const orgs = studio.organization.list().length;
-      const projects = studio.project.list().length;
-      const agents = studio.agents.list().length;
-      const tasks = studio.tasks.list().length;
-      return `orgs=${orgs} projects=${projects} agents=${agents} tasks=${tasks} paused=${studio.paused}`;
+      const orgs = guild.organization.list().length;
+      const projects = guild.project.list().length;
+      const agents = guild.agents.list().length;
+      const tasks = guild.tasks.list().length;
+      return `orgs=${orgs} projects=${projects} agents=${agents} tasks=${tasks} paused=${guild.paused}`;
     },
 
     async setup(_rest, ctx): Promise<string> {
       if (!ctx.hasUI) return "setup requires an interactive UI";
-      const existing = studio.organization.list();
+      const existing = guild.organization.list();
       if (existing.length > 0) {
-        const current = currentOrgId(studio) ?? existing[0].id;
+        const current = currentOrgId(guild) ?? existing[0].id;
         const org = existing.find((o) => o.id === current) ?? existing[0];
-        return `Already set up — organization "${org.name}". Run /studio to start a job.`;
+        return `Already set up — organization "${org.name}". Run /guild to start a job.`;
       }
       const name = await ctx.ui.input("Organization name:", "Acme Software");
       if (!name || name.trim() === "") return "setup cancelled";
-      const org = studio.organization.create(name.trim());
-      studio.policy.seedDefaults(org.id);
-      studio.repo.setSettingJson("currentOrgId", org.id);
+      const org = guild.organization.create(name.trim());
+      guild.policy.seedDefaults(org.id);
+      guild.repo.setSettingJson("currentOrgId", org.id);
 
       const route = await ctx.ui.select("Model routing:", [
         "Auto-assign from logged-in models (Recommended)",
         "Choose per model class",
-        "Skip — assign later with /studio models",
+        "Skip — assign later with /guild models",
       ]);
       if (route?.startsWith("Auto")) {
-        const assigned = studio.router.assignAuto(availableModels(ctx));
+        const assigned = guild.router.assignAuto(availableModels(ctx));
         ctx.ui.notify(
-          assigned > 0 ? `Assigned ${assigned} model class(es).` : "No logged-in models found — assign later with /studio models.",
+          assigned > 0 ? `Assigned ${assigned} model class(es).` : "No logged-in models found — assign later with /guild models.",
           "info",
         );
         return `Created organization "${org.name}" (${org.id}) and seeded default policies.`;
@@ -365,7 +365,7 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
       if (route?.startsWith("Choose")) {
         const models = availableModels(ctx);
         if (models.length === 0) {
-          return "Created organization but found no logged-in models. Assign models later with /studio models.";
+          return "Created organization but found no logged-in models. Assign models later with /guild models.";
         }
         const classes: Array<[string, string]> = [
           ["reasoning", "Reasoning"],
@@ -378,19 +378,19 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
           const choice = await ctx.ui.select(`${label} model:`, models.map((m) => `${m.provider}/${m.id}`));
           if (choice) {
             const parsed = parseModelRef(choice);
-            if (parsed) studio.router.setClassModel(cls, parsed.model, parsed.provider);
+            if (parsed) guild.router.setClassModel(cls, parsed.model, parsed.provider);
           }
         }
-        return `Created organization "${org.name}" and configured model routing.\n${studio.router.describe()}`;
+        return `Created organization "${org.name}" and configured model routing.\n${guild.router.describe()}`;
       }
       return `Created organization "${org.name}" (${org.id}) and seeded default policies.`;
     },
 
     async org(rest): Promise<string> {
       if (rest.length === 0) {
-        const orgs = studio.organization.list();
-        if (orgs.length === 0) return "No organizations. Run /studio setup.";
-        const current = currentOrgId(studio);
+        const orgs = guild.organization.list();
+        if (orgs.length === 0) return "No organizations. Run /guild setup.";
+        const current = currentOrgId(guild);
         return orgs
           .map((o) => `${o.id}  ${o.name}${o.id === current ? "  (current)" : ""}`)
           .join("\n");
@@ -398,31 +398,31 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
       const [verb, ...args] = rest;
       if (verb === "create") {
         const name = args.join(" ").trim();
-        if (!name) return "usage: /studio org create <name>";
-        const org = studio.organization.create(name);
+        if (!name) return "usage: /guild org create <name>";
+        const org = guild.organization.create(name);
         return `Created ${org.id}  ${org.name}`;
       }
       if (verb === "use") {
         const id = args[0];
-        if (!id) return "usage: /studio org use <id>";
-        if (!studio.organization.get(id)) return `No organization with id ${id}`;
-        studio.repo.setSettingJson("currentOrgId", id);
+        if (!id) return "usage: /guild org use <id>";
+        if (!guild.organization.get(id)) return `No organization with id ${id}`;
+        guild.repo.setSettingJson("currentOrgId", id);
         return `Now using organization ${id}`;
       }
-      return "usage: /studio org [create <name> | use <id>]";
+      return "usage: /guild org [create <name> | use <id>]";
     },
 
     async projects(rest): Promise<string> {
       if (rest[0] === "create") {
         const name = rest.slice(1).join(" ").trim();
-        if (!name) return "usage: /studio projects create <name>";
-        const orgId = currentOrgId(studio);
-        if (!orgId) return "No current organization — run /studio setup or /studio org use <id>.";
-        const project = studio.project.create(orgId, name);
+        if (!name) return "usage: /guild projects create <name>";
+        const orgId = currentOrgId(guild);
+        if (!orgId) return "No current organization — run /guild setup or /guild org use <id>.";
+        const project = guild.project.create(orgId, name);
         return `Created ${project.id}  ${project.name}`;
       }
-      const orgId = currentOrgId(studio);
-      const projects = studio.project.list(orgId);
+      const orgId = currentOrgId(guild);
+      const projects = guild.project.list(orgId);
       if (projects.length === 0) return "(no projects)";
       return projects.map((p) => `${p.id}  ${p.name}`).join("\n");
     },
@@ -431,16 +431,16 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
       if (rest[0] === "spawn") {
         const role = rest[1];
         const projectId = rest[2];
-        if (!role) return "usage: /studio agents spawn <role> [project]";
-        const orgId = currentOrgId(studio);
-        if (!orgId) return "No current organization — run /studio setup or /studio org use <id>.";
-        const roles = studio.repo.listRoles();
+        if (!role) return "usage: /guild agents spawn <role> [project]";
+        const orgId = currentOrgId(guild);
+        if (!orgId) return "No current organization — run /guild setup or /guild org use <id>.";
+        const roles = guild.repo.listRoles();
         const roleDef = roles.find((r) => r.name.toLowerCase() === role.toLowerCase());
         if (!roleDef) {
           return `Unknown role "${role}". Available: ${roles.map((r) => r.name).join(", ") || "none"}`;
         }
         const suffix = `${roleDef.name.toLowerCase()}-${Math.random().toString(36).slice(2, 6)}`;
-        const agent = studio.agents.create({
+        const agent = guild.agents.create({
           name: suffix,
           roleName: roleDef.name,
           roleId: roleDef.id,
@@ -453,38 +453,38 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
       }
       if (rest[0] === "stop") {
         const id = rest[1];
-        if (!id) return "usage: /studio agents stop <id>";
-        const agent = studio.agents.get(id);
+        if (!id) return "usage: /guild agents stop <id>";
+        const agent = guild.agents.get(id);
         if (!agent) return `No agent with id ${id}`;
-        studio.spawner.stop(id);
+        guild.spawner.stop(id);
         return `Stopped agent ${agent.name} (${id})`;
       }
-      return formatAgents(studio.agents.list());
+      return formatAgents(guild.agents.list());
     },
 
     async tasks(rest): Promise<string> {
       if (rest[0] === "create") {
         const [projectId, ...titleParts] = rest.slice(1);
         const title = titleParts.join(" ").trim();
-        if (!projectId || !title) return "usage: /studio tasks create <project> <title>";
-        const task = studio.tasks.create({ projectId, title });
+        if (!projectId || !title) return "usage: /guild tasks create <project> <title>";
+        const task = guild.tasks.create({ projectId, title });
         return `Created ${task.id}  [${task.state}] ${task.title}`;
       }
       if (rest[0] === "assign") {
         const [taskId, agentId] = rest.slice(1);
-        if (!taskId || !agentId) return "usage: /studio tasks assign <taskId> <agentId>";
-        studio.tasks.assign(taskId, agentId);
+        if (!taskId || !agentId) return "usage: /guild tasks assign <taskId> <agentId>";
+        guild.tasks.assign(taskId, agentId);
         return `Assigned task ${taskId} to agent ${agentId}`;
       }
-      return formatTasks(studio.tasks.list());
+      return formatTasks(guild.tasks.list());
     },
 
     async messages(rest): Promise<string> {
       if (rest[0] === "send") {
         const [recipient, ...textParts] = rest.slice(1);
         const text = textParts.join(" ").trim();
-        if (!recipient || !text) return "usage: /studio messages send <recipient> <text>";
-        const message = studio.messaging.send({
+        if (!recipient || !text) return "usage: /guild messages send <recipient> <text>";
+        const message = guild.messaging.send({
           senderName: "human",
           recipientId: recipient,
           content: text,
@@ -492,7 +492,7 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
         });
         return `Sent message ${message.id} to ${recipient}`;
       }
-      const messages = studio.messaging.list().slice(-20);
+      const messages = guild.messaging.list().slice(-20);
       if (messages.length === 0) return "(no messages)";
       return messages
         .map((m) => `${m.id}  ${m.senderName} -> ${m.recipientId}  [${m.messageType}] ${m.content.slice(0, 100)}`)
@@ -502,24 +502,24 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
     async goals(rest): Promise<string> {
       if (rest[0] === "create") {
         const title = rest.slice(1).join(" ").trim();
-        if (!title) return "usage: /studio goals create <title>";
-        const goal = studio.goal.create(title);
+        if (!title) return "usage: /guild goals create <title>";
+        const goal = guild.goal.create(title);
         return `Created ${goal.id}  [${goal.status}] ${goal.title}`;
       }
-      const goals = studio.goal.list();
+      const goals = guild.goal.list();
       if (goals.length === 0) return "(no goals)";
       return goals.map((g) => `${g.id}  [${g.status}] ${g.title}`).join("\n");
     },
 
     async policies(): Promise<string> {
-      const policies = studio.policy.list();
+      const policies = guild.policy.list();
       if (policies.length === 0) return "(no policies)";
       return policies.map((p) => `${p.id}  ${p.kind.toUpperCase()}  ${p.target}`).join("\n");
     },
 
     async config(rest): Promise<string> {
       if (rest.length === 0) {
-        const settings = studio.repo.allSettings();
+        const settings = guild.repo.allSettings();
         return Object.keys(settings).length === 0
           ? "(no settings)"
           : Object.entries(settings)
@@ -527,78 +527,78 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
               .join("\n");
       }
       if (rest[0] === "get") {
-        const value = studio.repo.getSetting(rest[1]);
+        const value = guild.repo.getSetting(rest[1]);
         return value === undefined ? `(unset) ${rest[1]}` : `${rest[1]} = ${value}`;
       }
       if (rest[0] === "set") {
         const [key, ...valueParts] = rest.slice(1);
         const value = valueParts.join(" ");
-        if (!key || !value) return "usage: /studio config set <key> <value>";
-        studio.repo.setSetting(key, value);
+        if (!key || !value) return "usage: /guild config set <key> <value>";
+        guild.repo.setSetting(key, value);
         return `Set ${key}.`;
       }
       if (rest[0] === "setjson") {
         const [key, ...jsonParts] = rest.slice(1);
         const json = jsonParts.join(" ");
-        if (!key || !json) return "usage: /studio config setjson <key> <json>";
+        if (!key || !json) return "usage: /guild config setjson <key> <json>";
         try {
-          studio.repo.setSettingJson(key, JSON.parse(json));
+          guild.repo.setSettingJson(key, JSON.parse(json));
         } catch {
           return `Invalid JSON for ${key}.`;
         }
         return `Set ${key} (json).`;
       }
-      return "usage: /studio config [get <key> | set <key> <value> | setjson <key> <json>]";
+      return "usage: /guild config [get <key> | set <key> <value> | setjson <key> <json>]";
     },
 
     async usage(rest): Promise<string> {
       if (rest[0]) {
-        return formatUsage(studio.repo.usageStats({ projectId: rest[0] }));
+        return formatUsage(guild.repo.usageStats({ projectId: rest[0] }));
       }
-      const lines = [`Total: ${formatUsage(studio.repo.usageStats())}`];
-      for (const p of studio.project.list()) {
-        lines.push(`${p.name}: ${formatUsage(studio.repo.usageStats({ projectId: p.id }))}`);
+      const lines = [`Total: ${formatUsage(guild.repo.usageStats())}`];
+      for (const p of guild.project.list()) {
+        lines.push(`${p.name}: ${formatUsage(guild.repo.usageStats({ projectId: p.id }))}`);
       }
       return lines.join("\n");
     },
 
     async dashboard(rest): Promise<string> {
       if (rest[0] === "stop") {
-        if (!studio.dashboard) return "Dashboard not running.";
-        await studio.dashboard.close();
-        studio.dashboard = undefined;
+        if (!guild.dashboard) return "Dashboard not running.";
+        await guild.dashboard.close();
+        guild.dashboard = undefined;
         return "Dashboard stopped.";
       }
       if (rest[0] === "status") {
-        return studio.dashboard ? `Dashboard running at ${studio.dashboard.url}` : "Dashboard not running.";
+        return guild.dashboard ? `Dashboard running at ${guild.dashboard.url}` : "Dashboard not running.";
       }
-      if (studio.dashboard) return `Dashboard already running at ${studio.dashboard.url}`;
+      if (guild.dashboard) return `Dashboard already running at ${guild.dashboard.url}`;
 
       const resolveEscalation = (id: string, status: "APPROVED" | "REJECTED") => {
-        studio.repo.resolveEscalation(id, status);
-        studio.repo.audit({
+        guild.repo.resolveEscalation(id, status);
+        guild.repo.audit({
           actor: "human",
           action: status === "APPROVED" ? "escalation.approve" : "escalation.reject",
           entityType: "escalation",
           entityId: id,
         });
-        studio.repo.recordEvent(StudioEvents.humanEscalationResolved, { escalationId: id, status });
-        studio.bus.emit(StudioEvents.humanEscalationResolved, { escalationId: id, status });
+        guild.repo.recordEvent(GuildEvents.humanEscalationResolved, { escalationId: id, status });
+        guild.bus.emit(GuildEvents.humanEscalationResolved, { escalationId: id, status });
       };
 
-      studio.dashboard = await startDashboard({
-        repo: studio.repo,
-        isPaused: () => studio.paused,
+      guild.dashboard = await startDashboard({
+        repo: guild.repo,
+        isPaused: () => guild.paused,
         pause: () => {
-          studio.paused = true;
+          guild.paused = true;
         },
         resume: () => {
-          studio.paused = false;
+          guild.paused = false;
         },
         approveEscalation: (id) => resolveEscalation(id, "APPROVED"),
         rejectEscalation: (id) => resolveEscalation(id, "REJECTED"),
       });
-      return `Dashboard running at ${studio.dashboard.url}`;
+      return `Dashboard running at ${guild.dashboard.url}`;
     },
 
     async models(rest, ctx): Promise<string> {
@@ -617,46 +617,46 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
           : [...byProvider.entries()].map(([p, n]) => `${p} (${n} model${n > 1 ? "s" : ""})`).join("\n");
       }
       if (rest[0] === "auto") {
-        const assigned = studio.router.assignAuto(availableModels(ctx), { provider: rest[1] });
+        const assigned = guild.router.assignAuto(availableModels(ctx), { provider: rest[1] });
         return assigned > 0
-          ? `Assigned ${assigned} model class(es).\n${studio.router.describe()}`
+          ? `Assigned ${assigned} model class(es).\n${guild.router.describe()}`
           : "(no logged-in models to assign)";
       }
       if (rest[0] === "preset") {
         const provider = rest[1];
-        if (!provider) return "usage: /studio models preset <provider> — e.g. opencode-go";
-        const assigned = studio.router.assignAuto(availableModels(ctx), { provider });
+        if (!provider) return "usage: /guild models preset <provider> — e.g. opencode-go";
+        const assigned = guild.router.assignAuto(availableModels(ctx), { provider });
         return assigned > 0
-          ? `Assigned ${assigned} model class(es) from ${provider}.\n${studio.router.describe()}`
+          ? `Assigned ${assigned} model class(es) from ${provider}.\n${guild.router.describe()}`
           : `No logged-in models for provider ${provider}.`;
       }
       if (rest[0] === "set") {
         const parsed = parseModelRef(rest[2]);
-        if (!rest[1] || !parsed) return "usage: /studio models set <role> <provider>/<model>";
-        studio.router.setRoleModel(rest[1], parsed.model, parsed.provider);
+        if (!rest[1] || !parsed) return "usage: /guild models set <role> <provider>/<model>";
+        guild.router.setRoleModel(rest[1], parsed.model, parsed.provider);
         return `Role ${rest[1]} -> ${parsed.provider}/${parsed.model}`;
       }
       if (rest[0] === "class") {
         const parsed = parseModelRef(rest[2]);
-        if (!rest[1] || !parsed) return "usage: /studio models class <reasoning|cheap-reasoning|coding|cheap-coding|research> <provider>/<model>";
-        studio.router.setClassModel(rest[1], parsed.model, parsed.provider);
+        if (!rest[1] || !parsed) return "usage: /guild models class <reasoning|cheap-reasoning|coding|cheap-coding|research> <provider>/<model>";
+        guild.router.setClassModel(rest[1], parsed.model, parsed.provider);
         return `Class ${rest[1]} -> ${parsed.provider}/${parsed.model}`;
       }
       if (rest[0] === "clear") {
-        studio.router.clear();
+        guild.router.clear();
         return "Model routing cleared.";
       }
-      return studio.router.describe();
+      return guild.router.describe();
     },
 
     async doctor(): Promise<string> {
-      const orgs = studio.repo.listOrganizations().length;
-      const projects = studio.repo.listProjects().length;
-      const agents = studio.repo.listAgents().length;
-      const tasks = studio.repo.listTasks().length;
-      const roles = studio.repo.listRoles().length;
-      const integrations = studio.repo.listIntegrations();
-      const settings = studio.repo.allSettings();
+      const orgs = guild.repo.listOrganizations().length;
+      const projects = guild.repo.listProjects().length;
+      const agents = guild.repo.listAgents().length;
+      const tasks = guild.repo.listTasks().length;
+      const roles = guild.repo.listRoles().length;
+      const integrations = guild.repo.listIntegrations();
+      const settings = guild.repo.allSettings();
       return [
         `DB path: ${defaultDbPath()}`,
         `Organizations: ${orgs}`,
@@ -682,7 +682,7 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
     async logs(rest): Promise<string> {
       const parsed = rest[0] ? Number.parseInt(rest[0], 10) : 20;
       const n = Number.isFinite(parsed) && parsed > 0 ? parsed : 20;
-      const entries = studio.repo.listAudit(n);
+      const entries = guild.repo.listAudit(n);
       if (entries.length === 0) return "No audit entries.";
       return entries
         .map(
@@ -693,40 +693,40 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
     },
 
     async pause(): Promise<string> {
-      studio.paused = true;
+      guild.paused = true;
       return "Scheduler paused.";
     },
 
     async recover(): Promise<string> {
-      const report = new RecoveryService(studio.repo).reconcile();
+      const report = new RecoveryService(guild.repo).reconcile();
       return `Recovery: reset ${report.agentsReset} agent(s), reopened ${report.tasksReopened} task(s).`;
     },
 
     async resume(): Promise<string> {
-      studio.paused = false;
+      guild.paused = false;
       return "Scheduler resumed.";
     },
 
     async stop(rest): Promise<string> {
       if (rest.length === 0) {
-        if (!studio.background?.isRunning()) return "Background scheduler not running.";
-        studio.background.stop();
-        studio.background = undefined;
+        if (!guild.background?.isRunning()) return "Background scheduler not running.";
+        guild.background.stop();
+        guild.background = undefined;
         return "Background scheduler stopped.";
       }
       if (rest[0] === "project") {
         const id = rest[1];
-        if (!id) return "usage: /studio stop project <id>";
-        const targets = studio.agents
+        if (!id) return "usage: /guild stop project <id>";
+        const targets = guild.agents
           .list({ projectId: id })
           .filter((a) => a.state !== "STOPPED" && a.state !== "COMPLETED");
-        for (const a of targets) studio.spawner.stop(a.id);
+        for (const a of targets) guild.spawner.stop(a.id);
         return `Stopped ${targets.length} agent(s) in project ${id}.`;
       }
       const id = rest[0];
-      const agent = studio.agents.get(id);
+      const agent = guild.agents.get(id);
       if (!agent) return `No agent with id ${id}`;
-      studio.spawner.stop(id);
+      guild.spawner.stop(id);
       return `Stopped agent ${agent.name} (${id})`;
     },
 
@@ -742,19 +742,19 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
       if (!ctx.hasUI) return "escalate requires an interactive UI";
       const problem = await ctx.ui.input("Problem:", "Describe what needs human attention");
       if (!problem || problem.trim() === "") return "escalation cancelled";
-      const escalation = studio.repo.createEscalation({ problem: problem.trim(), options: [] });
-      studio.repo.audit({
+      const escalation = guild.repo.createEscalation({ problem: problem.trim(), options: [] });
+      guild.repo.audit({
         actor: "human",
         action: "escalation.create",
         entityType: "escalation",
         entityId: escalation.id,
         details: { problem: escalation.problem },
       });
-      studio.repo.recordEvent(StudioEvents.humanEscalationCreated, {
+      guild.repo.recordEvent(GuildEvents.humanEscalationCreated, {
         escalationId: escalation.id,
         problem: escalation.problem,
       });
-      studio.bus.emit(StudioEvents.humanEscalationCreated, {
+      guild.bus.emit(GuildEvents.humanEscalationCreated, {
         escalationId: escalation.id,
         problem: escalation.problem,
       });
@@ -762,22 +762,22 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
     },
 
     async start(): Promise<string> {
-      if (studio.background?.isRunning()) return "Background scheduler already running.";
-      studio.background = new BackgroundScheduler(
-        studio.repo,
+      if (guild.background?.isRunning()) return "Background scheduler already running.";
+      guild.background = new BackgroundScheduler(
+        guild.repo,
         (projectId) => {
-          const runner = new ProjectRunner(studio.repo, studio.bus, studio.spawner);
+          const runner = new ProjectRunner(guild.repo, guild.bus, guild.spawner);
           return runner.runProject({
             projectId,
             reviewPolicy: "review_and_tests_required",
-            paused: () => studio.paused,
-            merge: (t) => studio.git.merge(t),
+            paused: () => guild.paused,
+            merge: (t) => guild.git.merge(t),
           });
         },
-        { pollMs: 2000, paused: () => studio.paused },
+        { pollMs: 2000, paused: () => guild.paused },
       );
-      studio.background.start();
-      return "Background scheduler started. /studio stop to halt.";
+      guild.background.start();
+      return "Background scheduler started. /guild stop to halt.";
     },
 
     async plane(rest): Promise<string> {
@@ -785,23 +785,23 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
       if (verb === "setup") {
         const [baseUrl, workspaceSlug, apiKey] = args;
         if (!baseUrl || !workspaceSlug || !apiKey) {
-          return "usage: /studio plane setup <baseUrl> <workspaceSlug> <apiKey>";
+          return "usage: /guild plane setup <baseUrl> <workspaceSlug> <apiKey>";
         }
-        const sync = new PlaneSyncService(studio.repo, new HttpPlaneClient({ baseUrl, apiKey, workspaceSlug }));
+        const sync = new PlaneSyncService(guild.repo, new HttpPlaneClient({ baseUrl, apiKey, workspaceSlug }));
         sync.saveConfig({ baseUrl, apiKey, workspaceSlug });
         return `Plane configured (${baseUrl}, workspace ${workspaceSlug}).`;
       }
       if (verb === "status") {
-        const config = PlaneSyncService.readConfig(studio.repo);
+        const config = PlaneSyncService.readConfig(guild.repo);
         return config
           ? `Plane configured: ${config.baseUrl} workspace=${config.workspaceSlug}`
-          : "Plane not configured. /studio plane setup <baseUrl> <workspaceSlug> <apiKey>";
+          : "Plane not configured. /guild plane setup <baseUrl> <workspaceSlug> <apiKey>";
       }
       if (verb === "sync") {
-        const config = PlaneSyncService.readConfig(studio.repo);
-        if (!config) return "Plane not configured. /studio plane setup <baseUrl> <workspaceSlug> <apiKey>";
-        const sync = new PlaneSyncService(studio.repo, new HttpPlaneClient(config));
-        const projectIds = args.length > 0 ? args : studio.project.list().map((p) => p.id);
+        const config = PlaneSyncService.readConfig(guild.repo);
+        if (!config) return "Plane not configured. /guild plane setup <baseUrl> <workspaceSlug> <apiKey>";
+        const sync = new PlaneSyncService(guild.repo, new HttpPlaneClient(config));
+        const projectIds = args.length > 0 ? args : guild.project.list().map((p) => p.id);
         const lines: string[] = [];
         for (const projectId of projectIds) {
           const result = await sync.pushProject(projectId);
@@ -810,21 +810,21 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
         return lines.join("\n");
       }
       if (verb === "comments") {
-        const config = PlaneSyncService.readConfig(studio.repo);
+        const config = PlaneSyncService.readConfig(guild.repo);
         if (!config) return "Plane not configured.";
-        const sync = new PlaneSyncService(studio.repo, new HttpPlaneClient(config));
+        const sync = new PlaneSyncService(guild.repo, new HttpPlaneClient(config));
         const count = await sync.pushComments(args[0]);
         return `Pushed ${count} comment(s).`;
       }
-      return "usage: /studio plane setup|status|sync [projectId]|comments <taskId>";
+      return "usage: /guild plane setup|status|sync [projectId]|comments <taskId>";
     },
 
     async github(rest): Promise<string> {
       const projectId = rest[0];
-      const repos = projectId ? studio.repo.listRepositories(projectId) : studio.repo.listRepositories();
+      const repos = projectId ? guild.repo.listRepositories(projectId) : guild.repo.listRepositories();
       const ghRepos = repos.filter((r) => r.kind === "github");
       if (ghRepos.length === 0) {
-        return "No GitHub repositories configured. /studio git setup <project> github <url>";
+        return "No GitHub repositories configured. /guild git setup <project> github <url>";
       }
       const lines: string[] = [];
       for (const repo of ghRepos) {
@@ -851,26 +851,26 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
 
   function resolveEscalation(rest: string[], status: "APPROVED" | "REJECTED"): string {
     const id = rest[0];
-    if (!id) return `usage: /studio ${status === "APPROVED" ? "approve" : "reject"} <escalationId>`;
-    const escalation = studio.repo.getEscalation(id);
+    if (!id) return `usage: /guild ${status === "APPROVED" ? "approve" : "reject"} <escalationId>`;
+    const escalation = guild.repo.getEscalation(id);
     if (!escalation) return `No escalation with id ${id}`;
-    studio.repo.resolveEscalation(id, status);
-    studio.repo.audit({
+    guild.repo.resolveEscalation(id, status);
+    guild.repo.audit({
       actor: "human",
       action: status === "APPROVED" ? "escalation.approve" : "escalation.reject",
       entityType: "escalation",
       entityId: id,
       details: { status },
     });
-    studio.repo.recordEvent(StudioEvents.humanEscalationResolved, {
+    guild.repo.recordEvent(GuildEvents.humanEscalationResolved, {
       escalationId: id,
       status,
     });
-    studio.bus.emit(StudioEvents.humanEscalationResolved, { escalationId: id, status });
+    guild.bus.emit(GuildEvents.humanEscalationResolved, { escalationId: id, status });
     return `Escalation ${id} ${status === "APPROVED" ? "approved" : "rejected"}.`;
   }
 
-  pi.registerCommand("studio", {
+  pi.registerCommand("guild", {
     description: "Pi Guild: multi-agent software-development organization control",
     handler: async (args, ctx) => {
       const tokens = args.trim().split(/\s+/).filter(Boolean);

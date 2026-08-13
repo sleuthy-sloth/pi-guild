@@ -1,7 +1,7 @@
 import type { NewPolicy, Policy } from "../types.ts";
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 import type { EventBus } from "../events.ts";
-import { bus as defaultBus, StudioEvents } from "../events.ts";
+import { bus as defaultBus, GuildEvents } from "../events.ts";
 
 const ACTOR = "system";
 const ENTITY = "policy";
@@ -22,7 +22,7 @@ const DANGEROUS_ACTIONS = new Set([
 export class PolicyService {
   private readonly bus: EventBus;
 
-  constructor(private readonly repo: StudioRepository, bus?: EventBus) {
+  constructor(private readonly repo: GuildRepository, bus?: EventBus) {
     this.bus = bus ?? defaultBus;
   }
 
@@ -46,8 +46,8 @@ export class PolicyService {
       entityType: ENTITY,
       entityId: id,
     });
-    this.repo.recordEvent(StudioEvents.policyChanged, { id, removed: true });
-    this.bus.emit(StudioEvents.policyChanged, { id, removed: true });
+    this.repo.recordEvent(GuildEvents.policyChanged, { id, removed: true });
+    this.bus.emit(GuildEvents.policyChanged, { id, removed: true });
   }
 
   /**
@@ -92,13 +92,13 @@ export class PolicyService {
       entityId: policy.id,
       details: { name, kind, target },
     });
-    this.repo.recordEvent(StudioEvents.policyChanged, {
+    this.repo.recordEvent(GuildEvents.policyChanged, {
       id: policy.id,
       name,
       kind,
       target,
     });
-    this.bus.emit(StudioEvents.policyChanged, { id: policy.id, name, kind, target });
+    this.bus.emit(GuildEvents.policyChanged, { id: policy.id, name, kind, target });
     return policy;
   }
 }

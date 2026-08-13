@@ -5,9 +5,9 @@ import { AgentSpawner } from "../../core/orchestration/spawner.ts";
 import type { AgentRunner } from "../../core/orchestration/spawner.ts";
 import { ProjectRunner } from "../../core/orchestration/runner.ts";
 import { DEFAULT_ROLES } from "../../agents/roles.ts";
-import type { StudioRepository } from "../../core/repository.ts";
+import type { GuildRepository } from "../../core/repository.ts";
 
-function seedRoles(repo: StudioRepository): void {
+function seedRoles(repo: GuildRepository): void {
   for (const r of DEFAULT_ROLES) {
     if (!repo.getRoleByName(r.name)) {
       repo.createRole({
@@ -30,7 +30,7 @@ describe("autonomous run (mocked runtime, no real LLM)", () => {
     const proj = repo.createProject({ name: "calculator", organizationId: org.id });
 
     // A fake agent runtime that behaves like a real team: the manager decomposes
-    // into tasks via the repository (standing in for studio tool calls), the
+    // into tasks via the repository (standing in for guild tool calls), the
     // reviewer approves, QA passes, and developers succeed.
     const runtime: AgentRunner = {
       async run(agent, task) {

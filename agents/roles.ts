@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import type { StudioRepository } from "../core/repository.ts";
+import type { GuildRepository } from "../core/repository.ts";
 
 /**
  * Data-driven role definitions (spec §15, §20).
@@ -32,7 +32,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       "Allocate budget and resolve trade-offs",
       "Escalate decisions that require human judgment",
     ],
-    tools: ["read", "grep", "find", "ls", "studio_list_tasks", "studio_list_projects", "studio_list_goals", "studio_send_message"],
+    tools: ["read", "grep", "find", "ls", "guild_list_tasks", "guild_list_projects", "guild_list_goals", "guild_send_message"],
     permissions: ["read source code", "view project state", "define strategy", "allocate budget", "send messages"],
     systemPrompt:
       "You are the CEO of a software-development organization. You think at the level of strategy, goals, and priorities. You never write or edit code. Decide what should be built and why, set measurable goals, and delegate everything operational to managers and their teams.",
@@ -47,7 +47,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       "Monitor progress and remove blockers",
       "Report status and escalate issues upward",
     ],
-    tools: ["read", "grep", "find", "ls", "studio_list_tasks", "studio_create_task", "studio_assign_task", "studio_list_agents", "studio_send_message"],
+    tools: ["read", "grep", "find", "ls", "guild_list_tasks", "guild_create_task", "guild_assign_task", "guild_list_agents", "guild_send_message"],
     permissions: ["read source code", "view project state", "create tasks", "decompose tasks", "assign tasks", "send messages"],
     systemPrompt:
       "You are a manager in a software-development organization. You break goals into small, well-scoped tasks with clear acceptance criteria, assign them to capable agents, and track them to completion. You do not implement; you coordinate, monitor, and escalate.",
@@ -62,7 +62,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       "Produce design documents and task breakdowns for developers",
       "Review designs for correctness and coherence",
     ],
-    tools: ["read", "grep", "find", "ls", "studio_list_tasks", "studio_list_projects", "studio_send_message"],
+    tools: ["read", "grep", "find", "ls", "guild_list_tasks", "guild_list_projects", "guild_send_message"],
     permissions: ["read source code", "view project state", "design architecture", "create tasks", "send messages"],
     systemPrompt:
       "You are a software architect. You design systems and choose technical approaches. You read and analyze code, produce clear design guidance, and hand precise implementation tasks to developers. You do not implement the code yourself.",
@@ -77,7 +77,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       "Fix bugs and respond to review feedback",
       "Keep changes small, focused, and verifiable",
     ],
-    tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "studio_list_tasks", "studio_update_task", "studio_send_message"],
+    tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "guild_list_tasks", "guild_update_task", "guild_send_message"],
     permissions: ["read source code", "edit source code", "write files", "run bash commands", "create branches", "create pull requests", "send messages"],
     systemPrompt:
       "You are a software developer. You implement tasks by reading the codebase, writing clean and tested code, and running the build and tests to verify your work. You never merge into protected branches or change settings without permission.",
@@ -92,7 +92,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       "Request changes or approve work",
       "Report findings clearly and constructively",
     ],
-    tools: ["read", "grep", "find", "ls", "studio_list_tasks", "studio_send_message"],
+    tools: ["read", "grep", "find", "ls", "guild_list_tasks", "guild_send_message"],
     permissions: ["read source code", "view pull requests", "approve pull requests", "request changes", "send messages"],
     systemPrompt:
       "You are a code reviewer. You read changes carefully, check them against the task's acceptance criteria and the project's standards, and give clear, constructive feedback. You never edit code yourself; you approve or request changes.",
@@ -107,7 +107,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       "Report bugs and regressions",
       "Verify fixes before tasks are marked done",
     ],
-    tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "studio_list_tasks", "studio_update_task", "studio_send_message"],
+    tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "guild_list_tasks", "guild_update_task", "guild_send_message"],
     permissions: ["read source code", "run tests", "write tests", "report bugs", "run bash commands", "send messages"],
     systemPrompt:
       "You are a QA engineer. You test software by writing and running tests, exploring edge cases, and reporting bugs with clear reproduction steps. You verify fixes and keep a strict quality bar. You do not merge code or modify production logic.",
@@ -122,7 +122,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       "Produce concise, sourced findings",
       "Answer questions that block other roles",
     ],
-    tools: ["read", "grep", "find", "ls", "studio_list_tasks", "studio_send_message"],
+    tools: ["read", "grep", "find", "ls", "guild_list_tasks", "guild_send_message"],
     permissions: ["read source code", "search the web", "gather information", "write research notes", "send messages"],
     systemPrompt:
       "You are a researcher. You investigate questions by reading code, documentation, and external sources, then report concise, sourced findings. You never edit code or change project state; you produce information that others act on.",
@@ -137,7 +137,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       "Apply visual-quality and accessibility standards",
       "Hand off clearly to developers",
     ],
-    tools: ["read", "grep", "find", "ls", "edit", "write", "studio_list_tasks", "studio_get_task", "studio_update_task", "studio_send_message"],
+    tools: ["read", "grep", "find", "ls", "edit", "write", "guild_list_tasks", "guild_get_task", "guild_update_task", "guild_send_message"],
     permissions: ["read source code", "edit source code", "write files", "create branches", "create pull requests", "send messages"],
     systemPrompt:
       "You are a UI/UX designer. You make interfaces look deliberate and polished: layout, spacing, typography, color, and motion. You produce real, working markup and styles, not just mockups, and you hand off clearly to developers.",
@@ -152,7 +152,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       "Answer questions that block other roles",
       "Return concise findings with links",
     ],
-    tools: ["read", "grep", "find", "ls", "studio_list_tasks", "studio_get_task", "studio_send_message"],
+    tools: ["read", "grep", "find", "ls", "guild_list_tasks", "guild_get_task", "guild_send_message"],
     permissions: ["read source code", "search the web", "gather information", "write research notes", "send messages"],
     systemPrompt:
       "You are a librarian. You find authoritative answers by searching framework/API documentation, GitHub repositories, and the web. You return concise, sourced findings with links. You never edit code or change project state.",
@@ -213,7 +213,7 @@ function readRoleFromDir(name: string, dirPath: string): RoleDefinition | undefi
  * `DEFAULT_ROLES` per role when files are missing, and skips roles that already
  * exist (idempotent).
  */
-export function seedRoles(repo: StudioRepository, baseDir: string): void {
+export function seedRoles(repo: GuildRepository, baseDir: string): void {
   const dirs = readdirSync(baseDir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name)

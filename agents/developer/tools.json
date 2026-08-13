@@ -7,14 +7,14 @@
     "grep",
     "find",
     "ls",
-    "studio_list_tasks",
-    "studio_get_task",
-    "studio_update_task",
-    "studio_send_message",
-    "studio_git_start",
-    "studio_git_commit",
-    "studio_git_push",
-    "studio_git_pull_request",
-    "studio_git_status"
+    "guild_list_tasks",
+    "guild_get_task",
+    "guild_update_task",
+    "guild_send_message",
+    "guild_git_start",
+    "guild_git_commit",
+    "guild_git_push",
+    "guild_git_pull_request",
+    "guild_git_status"
   ]
 }

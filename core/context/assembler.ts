@@ -7,7 +7,7 @@
  * `addSource()`.
  */
 import type { Task } from "../types.ts";
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 
 export interface ContextSource {
   name: string;
@@ -22,7 +22,7 @@ function section(title: string, lines: string[]): string {
 export class ContextAssembler {
   private readonly sources: ContextSource[] = [];
 
-  constructor(repo: StudioRepository) {
+  constructor(repo: GuildRepository) {
     this.sources.push(
       {
         name: "parent",

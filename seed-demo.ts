@@ -1,9 +1,9 @@
 import { createDb } from "./database/db.ts";
-import { StudioRepository } from "./core/repository.ts";
+import { GuildRepository } from "./core/repository.ts";
 
-export function seedDemoRepo(): StudioRepository {
-  const repo = new StudioRepository(createDb(":memory:"));
-  const org = repo.createOrganization({ name: "Acme Game Studio" });
+export function seedDemoRepo(): GuildRepository {
+  const repo = new GuildRepository(createDb(":memory:"));
+  const org = repo.createOrganization({ name: "Acme Game Guild" });
   const proj = repo.createProject({ name: "veil-of-secrets", organizationId: org.id });
   repo.createRepository({
     projectId: proj.id,

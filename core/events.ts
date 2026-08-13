@@ -6,9 +6,9 @@
  * via the repository's `recordEvent` for audit/replay, but runtime
  * subscriptions live here.
  */
-import type { StudioEvent } from "./types.ts";
+import type { GuildEvent } from "./types.ts";
 
-type Handler = (event: StudioEvent) => void | Promise<void>;
+type Handler = (event: GuildEvent) => void | Promise<void>;
 
 export class EventBus {
   private handlers = new Map<string, Set<Handler>>();
@@ -36,7 +36,7 @@ export class EventBus {
   }
 
   emit(type: string, payload: Record<string, unknown> = {}): void {
-    const event: StudioEvent = { type, payload, at: Date.now() };
+    const event: GuildEvent = { type, payload, at: Date.now() };
     const set = this.handlers.get(type);
     if (!set) return;
     for (const handler of [...set]) {
@@ -49,7 +49,7 @@ export class EventBus {
 }
 
 /** Canonical event names emitted across the system (spec §19). */
-export const StudioEvents = {
+export const GuildEvents = {
   agentCreated: "agent.created",
   agentStarted: "agent.started",
   agentStopped: "agent.stopped",

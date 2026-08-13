@@ -7,7 +7,7 @@
  *
  * The `respond` function is injected so tests can run without real model calls.
  */
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 
 export interface CouncilMember {
   provider: string;
@@ -29,7 +29,7 @@ export type CouncilResponder = (member: CouncilMember, prompt: string) => Promis
 
 export class Council {
   constructor(
-    private readonly repo: StudioRepository,
+    private readonly repo: GuildRepository,
     private readonly respond: CouncilResponder,
   ) {}
 

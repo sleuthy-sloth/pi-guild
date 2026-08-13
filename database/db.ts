@@ -13,11 +13,11 @@ export type Db = DatabaseSync;
 
 const SCHEMA_PATH = new URL("./schema.sql", import.meta.url).pathname;
 
-/** Default on-disk location: ~/.pi/agent/pi-guild/studio.db */
+/** Default on-disk location: ~/.pi/agent/pi-guild/guild.db */
 export function defaultDbPath(): string {
   const dir = resolve(homedir(), ".pi", "agent", "pi-guild");
   mkdirSync(dir, { recursive: true });
-  return resolve(dir, "studio.db");
+  return resolve(dir, "guild.db");
 }
 
 /** Open (creating if needed) the database at `path`, or in-memory for ":memory:". */

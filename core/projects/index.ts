@@ -1,5 +1,5 @@
 import type { NewProject, Project, ProjectMetrics } from "../types.ts";
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 import type { EventBus } from "../events.ts";
 import { bus as defaultBus } from "../events.ts";
 
@@ -9,7 +9,7 @@ const ENTITY = "project";
 export class ProjectService {
   private readonly bus: EventBus;
 
-  constructor(private readonly repo: StudioRepository, bus?: EventBus) {
+  constructor(private readonly repo: GuildRepository, bus?: EventBus) {
     this.bus = bus ?? defaultBus;
   }
 

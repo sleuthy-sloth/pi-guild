@@ -321,7 +321,7 @@ export interface BudgetPolicy {
 }
 
 /** Event payloads for the internal event bus (spec §19). */
-export interface StudioEvent {
+export interface GuildEvent {
   type: string;
   payload: Record<string, unknown>;
   at: number;

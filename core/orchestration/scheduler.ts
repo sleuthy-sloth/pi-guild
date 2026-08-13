@@ -1,5 +1,5 @@
 import type { Agent, Priority, Task } from "../types.ts";
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 import { bus as defaultBus } from "../events.ts";
 import type { EventBus } from "../events.ts";
 import { TaskService } from "../tasks/index.ts";
@@ -40,7 +40,7 @@ export class Scheduler {
   private readonly agents: AgentRegistryService;
 
   constructor(
-    private readonly repo: StudioRepository,
+    private readonly repo: GuildRepository,
     private readonly bus: EventBus = defaultBus,
     opts: SchedulerOptions = {},
   ) {

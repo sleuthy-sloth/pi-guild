@@ -6,7 +6,7 @@
  * thin shells; inject a fake provider in tests.
  */
 import type { Commit, PullRequest, Repository, Task } from "../types.ts";
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 import { buildProvider, type RepositoryProvider } from "../../integrations/git/index.ts";
 
 const DEFAULT_PROTECTED = ["main", "master"];
@@ -21,7 +21,7 @@ function slugify(title: string): string {
 
 export class GitService {
   constructor(
-    private readonly repo: StudioRepository,
+    private readonly repo: GuildRepository,
     private readonly resolveProvider: (repository: Repository) => RepositoryProvider = buildProvider,
   ) {}
 
@@ -57,7 +57,7 @@ export class GitService {
   private require(projectId: string): { repository: Repository; provider: RepositoryProvider } {
     const repository = this.repositoryFor(projectId);
     if (!repository) {
-      throw new Error(`no repository configured for project ${projectId} — run /studio git setup`);
+      throw new Error(`no repository configured for project ${projectId} — run /guild git setup`);
     }
     return { repository, provider: this.resolveProvider(repository) };
   }

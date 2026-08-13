@@ -6,7 +6,7 @@
  * interrupted IN_PROGRESS tasks to READY. We never blindly resume a half-done
  * run; work restarts from a clean, re-assignable state.
  */
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 import { AgentRegistryService } from "../agents/index.ts";
 import { TaskService } from "../tasks/index.ts";
 
@@ -21,7 +21,7 @@ export class RecoveryService {
   private readonly agents: AgentRegistryService;
   private readonly tasks: TaskService;
 
-  constructor(private readonly repo: StudioRepository) {
+  constructor(private readonly repo: GuildRepository) {
     this.agents = new AgentRegistryService(repo);
     this.tasks = new TaskService(repo);
   }

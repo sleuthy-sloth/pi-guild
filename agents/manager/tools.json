@@ -4,13 +4,13 @@
     "grep",
     "find",
     "ls",
-    "studio_list_tasks",
-    "studio_create_task",
-    "studio_decompose_task",
-    "studio_add_task_dependency",
-    "studio_list_task_dependencies",
-    "studio_assign_task",
-    "studio_list_agents",
-    "studio_send_message"
+    "guild_list_tasks",
+    "guild_create_task",
+    "guild_decompose_task",
+    "guild_add_task_dependency",
+    "guild_list_task_dependencies",
+    "guild_assign_task",
+    "guild_list_agents",
+    "guild_send_message"
   ]
 }

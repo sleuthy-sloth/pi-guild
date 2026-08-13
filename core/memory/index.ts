@@ -1,11 +1,11 @@
 import type { MemoryEntry, MemoryScope, NewMemory } from "../types.ts";
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 
 const ACTOR = "system";
 const ENTITY = "memory";
 
 export class MemoryService {
-  constructor(private readonly repo: StudioRepository) {}
+  constructor(private readonly repo: GuildRepository) {}
 
   add(scope: MemoryScope, content: string, opts: Partial<MemoryEntry> = {}): MemoryEntry {
     const input: NewMemory = { ...opts, scope, content };

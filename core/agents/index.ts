@@ -1,6 +1,6 @@
 import type { Agent, AgentState, NewAgent } from "../types.ts";
-import type { StudioRepository } from "../repository.ts";
-import { bus as defaultBus, StudioEvents } from "../events.ts";
+import type { GuildRepository } from "../repository.ts";
+import { bus as defaultBus, GuildEvents } from "../events.ts";
 import type { EventBus } from "../events.ts";
 
 export type { Agent, AgentState, NewAgent } from "../types.ts";
@@ -16,7 +16,7 @@ const ACTOR = "system";
  */
 export class AgentRegistryService {
   constructor(
-    private readonly repo: StudioRepository,
+    private readonly repo: GuildRepository,
     private readonly bus: EventBus = defaultBus,
   ) {}
 
@@ -29,8 +29,8 @@ export class AgentRegistryService {
       entityId: agent.id,
       details: { name: agent.name, roleName: agent.roleName, organizationId: agent.organizationId },
     });
-    this.repo.recordEvent(StudioEvents.agentCreated, { agentId: agent.id, agent });
-    this.bus.emit(StudioEvents.agentCreated, { agentId: agent.id, agent });
+    this.repo.recordEvent(GuildEvents.agentCreated, { agentId: agent.id, agent });
+    this.bus.emit(GuildEvents.agentCreated, { agentId: agent.id, agent });
     return agent;
   }
 
@@ -78,8 +78,8 @@ export class AgentRegistryService {
       entityId: id,
       details: { state, previous },
     });
-    this.repo.recordEvent(StudioEvents.agentStateChanged, { agentId: id, state, previous });
-    this.bus.emit(StudioEvents.agentStateChanged, { agentId: id, state, previous });
+    this.repo.recordEvent(GuildEvents.agentStateChanged, { agentId: id, state, previous });
+    this.bus.emit(GuildEvents.agentStateChanged, { agentId: id, state, previous });
   }
 
   setCurrentTask(id: string, taskId?: string): void {

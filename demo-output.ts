@@ -14,7 +14,7 @@ router.assignAuto([
   { provider: "openai", id: "gpt-4o-mini", name: "GPT-4o Mini" },
 ]);
 const proj = repo.listProjects()[0];
-const studio = {
+const guild = {
   tasks: new TaskService(repo),
   agents: new AgentRegistryService(repo),
   organization: new OrganizationService(repo),
@@ -23,10 +23,10 @@ const studio = {
 } as never;
 
 console.log("=== LIVE PANEL ===");
-console.log(formatLive(studio));
-console.log("\n=== /studio agents ===");
+console.log(formatLive(guild));
+console.log("\n=== /guild agents ===");
 console.log(formatAgents(repo.listAgents()));
-console.log("\n=== /studio tasks ===");
+console.log("\n=== /guild tasks ===");
 console.log(formatTasks(repo.listTasks({ projectId: proj.id })));
-console.log("\n=== /studio models ===");
+console.log("\n=== /guild models ===");
 console.log(router.describe());

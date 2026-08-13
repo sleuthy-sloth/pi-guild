@@ -1,5 +1,5 @@
 /**
- * StudioRepository — the single persistence facade over SQLite (spec §9).
+ * GuildRepository — the single persistence facade over SQLite (spec §9).
  *
  * Domain services and the Pi extension operate exclusively through this class
  * (agents never touch raw SQL). SQLite itself works in-memory (":memory:") or
@@ -62,7 +62,7 @@ function uuid(): string {
   return randomUUID();
 }
 
-export class StudioRepository {
+export class GuildRepository {
   constructor(readonly db: Db) {}
 
   close(): void {

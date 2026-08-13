@@ -3,15 +3,15 @@
  *
  * Commands and tools share one in-memory instance: a single SQLite connection,
  * one repository, one set of domain services, and the shared event bus. Nothing
- * is opened at import time — `getStudio()` opens + migrates the database on
+ * is opened at import time — `getGuild()` opens + migrates the database on
  * first use, seeds default roles and policies, and memoizes the result.
- * `resetStudio()` closes the database and clears the memo (called on
+ * `resetGuild()` closes the database and clears the memo (called on
  * `session_shutdown`).
  */
 import { fileURLToPath } from "node:url";
 import type { Db } from "../database/db.ts";
 import { createDb } from "../database/db.ts";
-import { StudioRepository } from "../core/repository.ts";
+import { GuildRepository } from "../core/repository.ts";
 import { bus } from "../core/events.ts";
 import type { EventBus } from "../core/events.ts";
 import { OrganizationService } from "../core/organization/index.ts";
@@ -35,13 +35,13 @@ import {
 import { seedRoles } from "../agents/roles.ts";
 import { GitService } from "../core/git/service.ts";
 import type { DashboardServer } from "../core/dashboard/server.ts";
-import { createStudioToolDefinitions } from "./tools/index.ts";
+import { createGuildToolDefinitions } from "./tools/index.ts";
 
 export { currentOrgId } from "./currentOrg.ts";
 
-export interface Studio {
+export interface Guild {
   db: Db;
-  repo: StudioRepository;
+  repo: GuildRepository;
   bus: EventBus;
   organization: OrganizationService;
   project: ProjectService;
@@ -56,25 +56,25 @@ export interface Studio {
   spawner: AgentSpawner;
   council: Council;
   git: GitService;
-  /** Created on `/studio start`; torn down on shutdown. */
+  /** Created on `/guild start`; torn down on shutdown. */
   background?: BackgroundScheduler;
-  /** Created on `/studio dashboard`; closed on shutdown. */
+  /** Created on `/guild dashboard`; closed on shutdown. */
   dashboard?: DashboardServer;
   paused: boolean;
 }
 
-let memo: Studio | undefined;
+let memo: Guild | undefined;
 
 /** Absolute path to the data-driven role definitions (../agents). */
 function agentsDir(): string {
   return fileURLToPath(new URL("../agents", import.meta.url));
 }
 
-export function getStudio(): Studio {
+export function getGuild(): Guild {
   if (memo) return memo;
 
   const db = createDb();
-  const repo = new StudioRepository(db);
+  const repo = new GuildRepository(db);
   const organization = new OrganizationService(repo, bus);
   const project = new ProjectService(repo, bus);
   const goal = new GoalService(repo, bus);
@@ -88,7 +88,7 @@ export function getStudio(): Studio {
   const council = new Council(repo, createCouncilResponder());
   const git = new GitService(repo);
 
-  const studio: Studio = {
+  const guild: Guild = {
     db,
     repo,
     bus,
@@ -102,7 +102,7 @@ export function getStudio(): Studio {
     messaging,
     scheduler,
     router,
-    // Assigned below so the spawner's customTools closure can reference `studio`.
+    // Assigned below so the spawner's customTools closure can reference `guild`.
     spawner: null as unknown as AgentSpawner,
     council,
     git,
@@ -111,13 +111,13 @@ export function getStudio(): Studio {
     paused: false,
   };
 
-  studio.spawner = new AgentSpawner(
+  guild.spawner = new AgentSpawner(
     repo,
     bus,
     createPiRunner({
       repo,
       router,
-      customTools: () => createStudioToolDefinitions(studio),
+      customTools: () => createGuildToolDefinitions(guild),
     }),
   );
 
@@ -134,11 +134,11 @@ export function getStudio(): Studio {
   // reset to a safe, re-assignable state (never blindly resumed).
   new RecoveryService(repo).reconcile();
 
-  memo = studio;
-  return studio;
+  memo = guild;
+  return guild;
 }
 
-export function resetStudio(): void {
+export function resetGuild(): void {
   if (!memo) return;
   memo.background?.stop();
   if (memo.dashboard) void memo.dashboard.close();

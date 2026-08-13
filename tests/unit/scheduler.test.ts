@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { AgentRegistryService } from "../../core/agents/index.ts";
 import { Scheduler } from "../../core/orchestration/scheduler.ts";
-import { StudioRepository } from "../../core/repository.ts";
+import { GuildRepository } from "../../core/repository.ts";
 import type { Agent } from "../../core/types.ts";
 import { newTestRepo } from "../helpers.ts";
 
 describe("Scheduler", () => {
-  let repo: StudioRepository;
+  let repo: GuildRepository;
   let agents: AgentRegistryService;
 
   beforeEach(() => {

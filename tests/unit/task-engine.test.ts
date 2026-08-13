@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { StudioRepository } from "../../core/repository.ts";
+import { GuildRepository } from "../../core/repository.ts";
 import { TaskService } from "../../core/tasks/index.ts";
 import { newTestRepo } from "../helpers.ts";
 
 describe("TaskService", () => {
-  let repo: StudioRepository;
+  let repo: GuildRepository;
   let tasks: TaskService;
 
   beforeEach(() => {

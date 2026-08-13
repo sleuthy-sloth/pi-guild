@@ -13,12 +13,12 @@ const mkTool = (name: string): ToolDefinition =>
   }) as unknown as ToolDefinition;
 
 const ALL = [
-  "studio_list_tasks",
-  "studio_create_task",
-  "studio_send_message",
-  "studio_git_commit",
-  "studio_council",
-  "studio_report_verdict",
+  "guild_list_tasks",
+  "guild_create_task",
+  "guild_send_message",
+  "guild_git_commit",
+  "guild_council",
+  "guild_report_verdict",
 ].map(mkTool);
 
 function role(tools: string[]): AgentRole {
@@ -37,11 +37,11 @@ function role(tools: string[]): AgentRole {
 describe("resolveRoleTools", () => {
   it("filters custom + built-in tools by the role's tool list", () => {
     const { customTools, builtinTools } = resolveRoleTools(
-      role(["read", "grep", "find", "ls", "studio_list_tasks", "studio_report_verdict"]),
+      role(["read", "grep", "find", "ls", "guild_list_tasks", "guild_report_verdict"]),
       ALL,
     );
 
-    expect(customTools.map((t) => t.name)).toEqual(["studio_list_tasks", "studio_report_verdict"]);
+    expect(customTools.map((t) => t.name)).toEqual(["guild_list_tasks", "guild_report_verdict"]);
     expect(builtinTools).toEqual(["read", "grep", "find", "ls"]);
   });
 

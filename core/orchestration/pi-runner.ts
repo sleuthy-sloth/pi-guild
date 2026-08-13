@@ -14,7 +14,7 @@ import {
 import { getModel } from "@earendil-works/pi-ai/compat";
 import type { Model } from "@earendil-works/pi-ai/compat";
 import type { Agent, AgentRole, Task } from "../types.ts";
-import type { StudioRepository } from "../repository.ts";
+import type { GuildRepository } from "../repository.ts";
 import { ABORT_SIGNAL_KEY, type AgentRunner, type AgentRunResult } from "./spawner.ts";
 import type { ModelRouter } from "./model-router.ts";
 import { ContextAssembler } from "../context/assembler.ts";
@@ -25,7 +25,7 @@ import { ContextAssembler } from "../context/assembler.ts";
  * Each `run()` spins up an in-process AgentSession via Pi's SDK with a project
  * workspace cwd, a role-derived system prompt, the model the ModelRouter
  * resolved for that role (falling back to the session default), and the shared
- * studio tool surface as `customTools`. Nothing is started at import time;
+ * guild tool surface as `customTools`. Nothing is started at import time;
  * sessions are created lazily inside `run()` and disposed in a `finally`.
  */
 
@@ -48,7 +48,7 @@ async function resolveModel(provider: string, modelId: string): Promise<Model<an
 const BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"];
 
 /**
- * Filter the shared studio tool surface down to what a role is allowed to use
+ * Filter the shared guild tool surface down to what a role is allowed to use
  * (spec §15: roles determine tools). Returns the custom tools and the built-in
  * tool names for the role; `builtinTools: undefined` means "role has no tool
  * restrictions — use defaults".
@@ -129,30 +129,30 @@ function buildTaskPrompt(task: Task, roleName?: string): string {
   switch (roleName) {
     case "Manager":
       lines.push(
-        "Record the plan by creating tasks with studio_create_task (or studio_decompose_task) and wiring order with studio_add_task_dependency. Then summarize the plan.",
+        "Record the plan by creating tasks with guild_create_task (or guild_decompose_task) and wiring order with guild_add_task_dependency. Then summarize the plan.",
       );
       break;
     case "Reviewer":
       lines.push(
-        'Review the work against the acceptance criteria, then end by calling studio_report_verdict with verdict "approve" or "request_changes" and your comments.',
+        'Review the work against the acceptance criteria, then end by calling guild_report_verdict with verdict "approve" or "request_changes" and your comments.',
       );
       break;
     case "QA":
       lines.push(
-        'Test the work, then end by calling studio_report_verdict with verdict "pass" or "fail" and your findings.',
+        'Test the work, then end by calling guild_report_verdict with verdict "pass" or "fail" and your findings.',
       );
       break;
     default:
       lines.push("Complete the task and report a concise summary of what changed and how it was verified.");
       lines.push(
-        "Commit your work locally with studio_git_commit. Push and pull requests only work when a remote repository is configured.",
+        "Commit your work locally with guild_git_commit. Push and pull requests only work when a remote repository is configured.",
       );
   }
   return lines.join("\n");
 }
 
 export interface CreatePiRunnerOptions {
-  repo: StudioRepository;
+  repo: GuildRepository;
   router: ModelRouter;
   workspaceDir?: string;
   customTools?: ToolDefinition[] | (() => ToolDefinition[]);
