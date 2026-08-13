@@ -190,6 +190,68 @@ truth.
 
 ---
 
+## What it looks like
+
+**The live TUI panel** (`/studio live`) — org/project/task counts plus the agent
+roster, updated live during runs:
+
+```text
+Pi Studio — live
+orgs=1 projects=1 paused=false
+tasks: DONE=1 IN_PROGRESS=1 REVIEW=1 QA=1 BACKLOG=1
+
+name       role       state      id
+architect  Architect  IDLE       6e5a5e1d
+ceo        CEO        IDLE       2757689e
+designer   Designer   IDLE       1fd1eb2b
+dev-1      Developer  WORKING    97002811
+dev-2      Developer  BLOCKED    4322226c
+manager    Manager    WORKING    93985055
+qa         QA         WAITING    a6877c1b
+reviewer   Reviewer   REVIEWING  a4106543
+```
+
+**The browser dashboard** (`/studio dashboard`) — the same state in a live,
+auto-refreshing web view with color-coded statuses, escalation approve/reject,
+and per-project progress:
+
+![Pi Studio dashboard](docs/screenshots/dashboard.png)
+
+**Command output** is aligned and id-truncated. A team mid-run looks like this:
+
+```text
+/studio agents
+
+name       role       state      id
+architect  Architect  IDLE       6e5a5e1d
+ceo        CEO        IDLE       2757689e
+dev-1      Developer  WORKING    97002811
+dev-2      Developer  BLOCKED    4322226c
+manager    Manager    WORKING    93985055
+reviewer   Reviewer   REVIEWING  a4106543
+qa         QA         WAITING    a6877c1b
+
+/studio tasks
+
+state        title            assignee    id
+DONE         Player movement  97002811    763e1486
+IN_PROGRESS  Combat system    97002811    55489cde
+REVIEW       Inventory UI     4322226c    d0e47b2b
+QA           Boss fight       4322226c    4ceadd68
+BACKLOG      Save system      (unassigned)  7a4cbb98
+
+/studio models
+
+  reasoning        -> anthropic/claude-sonnet-4-5
+  cheap reasoning  -> opencode-go/deepseek-v4-pro
+  coding           -> opencode-go/deepseek-v4-pro
+  cheap coding     -> opencode-go/deepseek-v4-pro
+  research         -> opencode-go/deepseek-v4-pro
+```
+
+These examples were generated from the real formatting code against demo data
+(see `seed-demo.ts`); regenerate them with `npx tsx demo-output.ts`.
+
 ## Model routing
 
 Models are assigned per **model class** — `reasoning`, `cheap-reasoning`,

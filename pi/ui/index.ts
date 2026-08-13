@@ -14,6 +14,11 @@ function maxWidth(values: string[], fallback: number): number {
   return values.reduce((max, v) => Math.max(max, v.length), fallback);
 }
 
+/** Short readable ids (8 chars) in terminal output. */
+function shortId(id: string): string {
+  return id ? id.slice(0, 8) : id;
+}
+
 /** Aligned name / role / state / id columns. */
 export function formatAgents(agents: Agent[]): string {
   if (agents.length === 0) return "(no agents)";
@@ -22,7 +27,7 @@ export function formatAgents(agents: Agent[]): string {
   const stateW = maxWidth(agents.map((a) => a.state), 5);
   const header = `${column("name", nameW)}  ${column("role", roleW)}  ${column("state", stateW)}  id`;
   const rows = agents.map(
-    (a) => `${column(a.name, nameW)}  ${column(a.roleName, roleW)}  ${column(a.state, stateW)}  ${a.id}`,
+    (a) => `${column(a.name, nameW)}  ${column(a.roleName, roleW)}  ${column(a.state, stateW)}  ${shortId(a.id)}`,
   );
   return [header, ...rows].join("\n");
 }
@@ -35,8 +40,8 @@ export function formatTasks(tasks: Task[]): string {
   const assigneeW = maxWidth(tasks.map((t) => t.assigneeId ?? "(unassigned)"), 11);
   const header = `${column("state", stateW)}  ${column("title", titleW)}  ${column("assignee", assigneeW)}  id`;
   const rows = tasks.map((t) => {
-    const assignee = t.assigneeId ?? "(unassigned)";
-    return `${column(t.state, stateW)}  ${column(t.title, titleW)}  ${column(assignee, assigneeW)}  ${t.id}`;
+    const assignee = t.assigneeId ? shortId(t.assigneeId) : "(unassigned)";
+    return `${column(t.state, stateW)}  ${column(t.title, titleW)}  ${column(assignee, assigneeW)}  ${shortId(t.id)}`;
   });
   return [header, ...rows].join("\n");
 }
