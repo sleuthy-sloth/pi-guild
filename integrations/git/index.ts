@@ -56,6 +56,12 @@ export class LocalGitProvider implements RepositoryProvider {
 
   async init(): Promise<void> {
     await this.git(["init"]);
+    await this.git(["add", "-A"]);
+    try {
+      await this.git(["commit", "-m", "chore: initial commit"]);
+    } catch {
+      // Nothing to commit (empty repo) — callers should place a file first.
+    }
   }
 
   async createBranch(branch: string): Promise<void> {
@@ -73,6 +79,12 @@ export class LocalGitProvider implements RepositoryProvider {
   }
 
   async push(branch: string): Promise<void> {
+    // A fresh local repo has no remote — skip rather than fail the run.
+    try {
+      await this.git(["remote", "get-url", "origin"]);
+    } catch {
+      return;
+    }
     await this.git(["push", "-u", "origin", branch]);
   }
 

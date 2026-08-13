@@ -6,6 +6,7 @@
  * `ctx.ui.notify`, or drives an interactive dialog when `ctx.hasUI`.
  */
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { StudioEvents } from "../../core/events.ts";
@@ -120,6 +121,23 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
 
       const project = studio.project.create(orgId, projectName);
       studio.goal.create(goalText, { organizationId: orgId, projectId: project.id });
+
+      // Give the team a real local repo to work in (branch + commit work locally;
+      // push/PR need a remote configured later via /studio git setup). Non-fatal:
+      // if git isn't available, the team still works in the workspace.
+      try {
+        const workspaceDir = join(homedir(), ".pi", "agent", "pi-studio", "workspaces", project.id);
+        mkdirSync(workspaceDir, { recursive: true });
+        writeFileSync(
+          join(workspaceDir, "README.md"),
+          `# ${projectName}\n\nAutonomous workspace for: ${goalText}\n`,
+        );
+        const gitProvider = new LocalGitProvider(workspaceDir);
+        await gitProvider.init();
+        studio.git.register(project.id, { kind: "local", path: workspaceDir });
+      } catch {
+        ctx.ui.notify("Could not initialize a git repository — the team will work without one.", "warning");
+      }
 
       const runner = new ProjectRunner(studio.repo, studio.bus, studio.spawner);
       ctx.ui.notify(`Planning "${goalText}"…`, "info");
@@ -297,6 +315,12 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
 
     async setup(_rest, ctx): Promise<string> {
       if (!ctx.hasUI) return "setup requires an interactive UI";
+      const existing = studio.organization.list();
+      if (existing.length > 0) {
+        const current = currentOrgId(studio) ?? existing[0].id;
+        const org = existing.find((o) => o.id === current) ?? existing[0];
+        return `Already set up — organization "${org.name}". Run /studio to start a job.`;
+      }
       const name = await ctx.ui.input("Organization name:", "Acme Software");
       if (!name || name.trim() === "") return "setup cancelled";
       const org = studio.organization.create(name.trim());

@@ -4,6 +4,24 @@ All notable changes to Pi Studio are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - unreleased
+
+### Fixed / improved (pre-first-run hardening)
+
+- **Role-based tool filtering** — spawned agents now get only the tools their
+  role's `tools.json` allows (custom + built-in). Reviewers no longer get
+  `bash`/`edit`/`write`; every agent carries a smaller, role-appropriate tool
+  surface.
+- **`LocalGitProvider.init`** makes an initial commit (so branching works on a
+  fresh repo); **`push` skips silently when no remote exists** instead of
+  failing the run.
+- **`/studio` wizard** auto-initializes a local repository in the project
+  workspace (non-fatal if git is unavailable).
+- **`/studio setup`** is idempotent — re-running reuses the existing
+  organization instead of duplicating it.
+- Developer task prompt + role prompt note: commit locally; push/PR need a
+  remote.
+
 ## [0.8.0] - unreleased
 
 ### Added

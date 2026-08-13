@@ -35,6 +35,29 @@ const resolveCatalogModel = getModel as unknown as (
   modelId: string,
 ) => Model<any> | undefined;
 
+/** Built-in tool names that Pi's SDK can enable via the `tools` option. */
+const BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"];
+
+/**
+ * Filter the shared studio tool surface down to what a role is allowed to use
+ * (spec §15: roles determine tools). Returns the custom tools and the built-in
+ * tool names for the role; `builtinTools: undefined` means "role has no tool
+ * restrictions — use defaults".
+ */
+export function resolveRoleTools(
+  role: AgentRole | undefined,
+  allCustomTools: ToolDefinition[],
+): { customTools: ToolDefinition[]; builtinTools: string[] | undefined } {
+  if (!role || role.tools.length === 0) {
+    return { customTools: allCustomTools, builtinTools: undefined };
+  }
+  const allowed = new Set(role.tools);
+  return {
+    customTools: allCustomTools.filter((t) => allowed.has(t.name)),
+    builtinTools: BUILTIN_TOOL_NAMES.filter((n) => allowed.has(n)),
+  };
+}
+
 function defaultWorkspaceDir(projectId: string): string {
   return join(homedir(), ".pi", "agent", "pi-studio", "workspaces", projectId);
 }
@@ -112,6 +135,9 @@ function buildTaskPrompt(task: Task, roleName?: string): string {
       break;
     default:
       lines.push("Complete the task and report a concise summary of what changed and how it was verified.");
+      lines.push(
+        "Commit your work locally with studio_git_commit. Push and pull requests only work when a remote repository is configured.",
+      );
   }
   return lines.join("\n");
 }
@@ -162,12 +188,20 @@ export function createPiRunner(opts: CreatePiRunnerOptions): AgentRunner {
 
       const tools = typeof opts.customTools === "function" ? opts.customTools() : opts.customTools;
 
+      const { customTools: roleTools, builtinTools } = resolveRoleTools(role, tools ?? []);
+      const customToolNames = roleTools.map((t) => t.name);
+      // Only pass `tools` when the role specifies a tool set — otherwise keep
+      // Pi's default built-ins.
+      const sessionTools =
+        builtinTools === undefined ? undefined : [...builtinTools, ...customToolNames];
+
       const { session } = await createAgentSession({
         cwd,
         model,
         sessionManager: SessionManager.inMemory(cwd),
         resourceLoader,
-        customTools: tools,
+        customTools: roleTools,
+        tools: sessionTools,
       });
 
       // Capture the agent's final answer as the run summary (streamed deltas).
