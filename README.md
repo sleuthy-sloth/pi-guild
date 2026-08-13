@@ -14,23 +14,34 @@ Pi Studio is **local-first** and **offline by default**. Agents run with full
 system permissions (see [Security](#security-model)); treat the workspace and
 model providers you grant as trusted boundaries.
 
+---
+
 ## Features
 
 - **Guided autonomous runs** — `/studio` asks what to build, then plans and runs
-  the whole team through to `DONE`.
+  the whole team through to `DONE` — no manual spawning or assigning.
 - **Nine data-driven roles** — CEO, Manager, Architect, Developer, Reviewer, QA,
   Researcher, Designer, Librarian — editable without touching code.
 - **Dependency-gated scheduler** — tasks only run when their dependencies are
-  done; cycle detection rejects invalid graphs.
-- **Git workflow** — branches, commits, push, and PRs, with protected-branch
-  defaults, behind one `RepositoryProvider` abstraction (local git + GitHub).
-- **Review & QA pipeline** — dev → review → QA with configurable approval policy.
+  done; cycle detection rejects invalid graphs; design-labeled tasks route to a
+  Designer.
+- **Review → QA pipeline** — dev → review → QA with a configurable approval
+  policy, and **auto-merge** of PRs (unless `manual_merge`).
+- **Git workflow** — branches, commits, push, PRs, and merges with
+  protected-branch defaults, behind one `RepositoryProvider` abstraction
+  (local git + GitHub).
+- **Model routing** — assign models per role or per model class, auto-assign
+  from whatever's logged in on the harness, or preset to one provider
+  (e.g. OpenCode Go).
 - **Council (multi-model synthesis)** — run one question through several models
   and reconcile a consensus.
-- **Skills** — per-role `SKILL.md` injection; **context assembly** gathers
-  relevant memory, decisions, and prior attempts into each agent's prompt.
-- **Background workers** — fire-and-forget jobs via `/studio bg`.
-- **Live TUI panel** — watch the agent roster as it works.
+- **Skills & context assembly** — per-role `SKILL.md` injection, plus a context
+  assembler that gathers relevant memory, decisions, and prior attempts into
+  each agent's prompt.
+- **Background workers** — fire-and-forget jobs via `/studio bg`, and an
+  explicitly-started background scheduler (`/studio start`).
+- **Live TUI panel + browser dashboard** — watch the agent roster in the TUI or
+  in a local web dashboard.
 - **Recovery & budgets** — restart reconciliation, plus token/call/time limits
   with `continue` / `pause` / `escalate`.
 - **Optional Plane adapter** — mirror projects/tasks into a Plane workspace.
@@ -73,13 +84,15 @@ model providers you grant as trusted boundaries.
 | Agent definitions | `agents/` | data-driven role files (`role.md`, `policy.json`, `tools.json`, `prompt.md`, `skills.json`) |
 | Skills | `skills/` | `SKILL.md` files injected into role prompts |
 | Integrations | `integrations/` | git / github / plane adapters (all optional) |
-| UI | `ui/` | optional browser dashboard (later milestone) |
+| UI | `ui/` | the optional browser dashboard |
 
 **Runtime model.** Each agent is a genuine in-process agent loop created with
 Pi's SDK `createAgentSession()` — its own `cwd` (project workspace), `model`,
 `tools`, and `SessionManager`. Multiple sessions can run concurrently; the
 scheduler decides *which* run, *when*, and *why*. There are no persistent
 manager processes: management runs in ephemeral sessions triggered by events.
+Each agent receives **only the tools its role allows** (a Reviewer cannot edit
+code; a Developer gets the git workflow).
 
 **No background daemon.** Nothing is started from the extension factory. The
 background scheduler is an explicit, started component — `/studio start` spawns
@@ -97,87 +110,109 @@ from npm:
 pi install npm:pi-studio
 ```
 
+For local development, install straight from a checkout:
+
+```bash
+git clone <your-fork> pi-studio && cd pi-studio
+npm install
+pi install .            # local-path install; reloads pick up source changes
+```
+
 There are no native modules and no runtime dependencies beyond Pi's own peer
 packages. The database is `node:sqlite`, part of the Node standard library.
 
-## Setup
+---
 
-After installing, run the one-time setup from inside Pi:
+## First-run walkthrough
+
+**1. Set up the organization and models**
 
 ```text
 /studio setup
 ```
 
 This creates the local database at `~/.pi/agent/pi-studio/studio.db`, seeds the
-nine default agent roles, and seeds the default policy set (safe actions
-allowed, dangerous actions denied).
+nine agent roles and the default policy set, then asks how you want to route
+models:
 
-## Quick start
+- **Auto-assign from logged-in models** (recommended) — reads what the harness
+  reports as authenticated and assigns all five model classes.
+- **Choose per class** — walks you through five pickers (reasoning, cheap
+  reasoning, coding, cheap coding, research).
+- **Skip** — assign later with `/studio models`.
 
-Just run `/studio` and answer the prompts — Pi Studio plans and runs the
-whole team itself:
+Skip nothing — model routing takes a minute and decides the whole team's cost
+and quality profile (see [Model routing](#model-routing)).
+
+**2. Run a job**
 
 ```text
 /studio
 ```
 
-It asks what to build, the project name, and the approval policy, then creates
-the organization/project/goal, spawns a manager to decompose the work into
-tasks, and runs developers → reviewers → QA through to `DONE`, reporting
-progress as it goes. Hold it anytime with `/studio pause`, resume with
-`/studio resume`, and check where things stand with `/studio status`.
+Answer the prompts: what to build, the project name, and the approval policy.
+Pi Studio then:
 
-Prefer the manual controls? They still work:
+1. Creates the organization/project/goal.
+2. Initializes a local git repository in the project workspace.
+3. Spawns a **Manager** agent that decomposes the goal into tasks via the
+   `studio_*` tools (falling back to a deterministic plan if the model yields
+   nothing).
+4. Runs the dependency-gated loop: **Developers** implement (branch + commit
+   locally) → **Reviewer** approves/requests changes → **QA** passes/fails →
+   `DONE`, merging the PR automatically unless you chose `manual_merge`.
+
+Progress streams as TUI notifications. Hold it with `/studio pause`, resume
+with `/studio resume`, inspect with `/studio status` / `/studio agents` /
+`/studio tasks`.
+
+**3. Watch it work**
 
 ```text
-/studio setup
-/studio org create "Acme"
-/studio projects create "calculator"
-/studio agents spawn Developer
-/studio tasks create <project-id> "Build a four-function calculator"
-/studio tasks assign <task-id> <agent-id>
+/studio live                          # live agent panel in the TUI
+/studio dashboard                     # browser dashboard at http://127.0.0.1:<port>
 ```
 
-Tasks flow through the dependency-aware scheduler: a task becomes `READY` only
-when every dependency is `DONE`, and the scheduler pairs `READY` tasks with
-`IDLE` agents up to the configured concurrency limit. Managers never poll —
-task completion emits `task.completed`, which wakes any agent `WAITING` on that
-work.
+The dashboard auto-refreshes every 2 seconds and lets you pause/resume and
+approve/reject escalations from the browser.
 
-## Configuration
+**4. Wire up real infrastructure (optional)**
 
-Configuration lives in the SQLite `settings` table, editable via `/studio config`.
+```text
+/studio git setup <project> github https://github.com/you/repo   # push + PRs
+/studio plane setup <base-url> <workspace-slug> <api-key>        # Plane mirror
+/studio plane sync <project-id>
+/studio github <project-id>                                      # PR/CI status
+```
 
-| Key | Description | Default |
-|-----|-------------|---------|
-| `modelRouter` | role → `{ model, provider }` overrides | `{}` |
-| `modelRouterClasses` | model class → `{ model, provider }` (see Model routing) | `{}` |
-| budgets (`organizations.budgets`) | token/call/minute/retry limits and `onLimit` behavior | `{ "onLimit": "continue" }` |
-| `maxConcurrentAgents` | scheduler concurrency bound | `4` |
-| `councilModels` | `[{ provider, model }]` members for multi-model synthesis | `[]` |
-| `notifications` | toggles for TUI notifications | all on |
+Everything works without these — they're mirrors on top of the local source of
+truth.
 
-Model classes (never vendor names) route roles to models: `reasoning`,
-`cheap-reasoning`, `coding`, `cheap-coding`, `research`.
+---
 
 ## Model routing
 
-Assign models per role — either during `/studio setup` (it offers
-auto-assign / choose per class / skip) or anytime with `/studio models`:
+Models are assigned per **model class** — `reasoning`, `cheap-reasoning`,
+`coding`, `cheap-coding`, `research` — so five choices cover every role, with
+per-role overrides on top. No vendor names are hardcoded.
 
 ```text
 /studio models list                  # what's logged in on the harness
+/studio models providers             # which providers have models
 /studio models auto                  # best-effort auto-assign all classes
 /studio models preset opencode-go    # auto-assign using only one provider
 /studio models class coding opencode-go/deepseek-v4-pro
 /studio models set Developer anthropic/claude-sonnet-4-5   # per-role override
-/studio models
+/studio models clear                 # reset routing
+/studio models                       # show current assignments
 ```
 
-Models are assigned per model-class, so five choices cover every role.
-Auto-assign reads the models the harness reports as logged in and prefers
-capability hints (e.g. `opus`/`sonnet` → reasoning, `haiku`/`mini`/`deepseek`
-→ cheap). No vendor names are hardcoded.
+Auto-assign reads the models the harness reports as logged in
+(`ctx.modelRegistry.getAvailable()`) and prefers capability hints — `opus` /
+`sonnet` / `o3` / `o4` → reasoning, `code` / `claude` / `gpt` / `deepseek` →
+coding, `haiku` / `mini` / `flash` / `deepseek` → cheap classes. The runner
+resolves assigned models through Pi's `ModelRuntime`, so custom providers (like
+`opencode-go` from `models.json`) work, not just the static catalog.
 
 ## Commands
 
@@ -186,7 +221,7 @@ All commands live under the `/studio` namespace:
 | Command | Purpose |
 |---------|---------|
 | `/studio` / `run` | guided wizard: plan + run a job autonomously |
-| `/studio setup` | wizard: create DB, seed roles + default policies |
+| `/studio setup` | wizard: create DB, seed roles + policies, configure model routing |
 | `/studio status` | org/project/agent/task counts + pause flag |
 | `/studio org` / `org create <name>` / `org use <id>` | list / create / select organizations |
 | `/studio projects` / `projects create <name>` | list / create projects in the current org |
@@ -198,23 +233,23 @@ All commands live under the `/studio` namespace:
 | `/studio escalate` / `approve <id>` / `reject <id>` | create / resolve human escalations |
 | `/studio pause` / `resume` | pause / resume the scheduler |
 | `/studio recover` | reset orphaned agents/tasks (also runs on start) |
-| `/studio stop <agentId>` / `stop project <id>` | stop an agent or a project's agents |
+| `/studio stop <agentId>` / `stop project <id>` / `stop` | stop an agent, a project's agents, or the background scheduler |
 | `/studio council [question]` / `members` / `add <provider>/<model>` / `reset` | multi-model synthesis |
 | `/studio bg <role> <prompt>` | fire-and-forget background job |
 | `/studio live` | refresh the live agent panel |
+| `/studio start` | start the background scheduler loop |
 | `/studio git setup <project> local <path>` / `github <url>` | register a repository |
 | `/studio git branch` / `commit` / `push` / `pr` / `merge` / `log <taskId>` | the git workflow |
 | `/studio plane setup <baseUrl> <slug> <apiKey>` / `status` / `sync [projectId]` / `comments <taskId>` | Plane mirror |
+| `/studio github [projectId]` | PR / CI status via `gh` |
 | `/studio config [get <key>` / `set <key> <value>` / `setjson <key> <json>]` | read/write settings |
 | `/studio usage [projectId]` | token/call/time usage |
 | `/studio models [list` / `providers` / `auto` / `preset <provider>` / `set` / `class` / `clear]` | model routing |
 | `/studio dashboard [status` / `stop]` | start/stop the browser dashboard |
 | `/studio doctor` | DB path, counts, integrations, settings |
 | `/studio logs [N]` | last N audit entries |
-| `/studio github [projectId]` | PR / CI status via `gh` |
-| `/studio start` / `stop` | start / stop the background scheduler loop |
 
-The same surface is available to agents as 33 `studio_*` tools
+The same surface is available to agents as **34 `studio_*` tools**
 (`studio_list_tasks`, `studio_create_task`, `studio_decompose_task`,
 `studio_add_task_dependency`, `studio_send_message`, `studio_record_decision`,
 `studio_report_verdict`, `studio_git_*`, `studio_council`,
@@ -231,7 +266,7 @@ Nine data-driven roles ship in `agents/` (each with `role.md`, `policy.json`,
 | **Manager** | decompose goals into tasks, assign, monitor, escalate | create/decompose/assign tasks |
 | **Architect** | system design, technical decisions, task breakdowns | design + create tasks |
 | **Developer** | implement code, write tests, fix bugs | edit code, run bash, git workflow |
-| **Reviewer** | review code against acceptance criteria | read + approve/request changes |
+| **Reviewer** | review code against acceptance criteria | read + approve/request changes; never edits code |
 | **QA** | write/run tests, report bugs, verify fixes | run tests, write tests, report bugs |
 | **Researcher** | investigate unknowns, produce sourced findings | read + search the web |
 | **Designer** | UI/UX: layout, typography, color, motion; produces working markup/styles | edit code, create branches |
@@ -239,14 +274,17 @@ Nine data-driven roles ship in `agents/` (each with `role.md`, `policy.json`,
 
 Roles are **data-driven**: edit the files in `agents/<role>/` to change a role's
 tools, permissions, or system prompt without touching code. `seedRoles()` is
-idempotent and falls back to built-in defaults when files are missing.
+idempotent and falls back to built-in defaults when files are missing. The
+runner **enforces** each role's tool list at session build time.
 
 ## Git workflow
 
 Developer agents create branches, commit, push, and open pull requests via the
-`studio_git_*` tools (or `/studio git ...`), with protected-branch defaults and
-branch naming (`feature/<taskId>-<slug>`, `bugfix/`, `refactor/`). Local git and
-GitHub (`gh` CLI) sit behind one `RepositoryProvider` abstraction.
+`studio_git_*` tools (or `/studio git ...`), with protected-branch defaults
+(`main`/`master`) and branch naming (`feature/<taskId>-<slug>`, `bugfix/`,
+`refactor/`). Local git and GitHub (`gh` CLI) sit behind one
+`RepositoryProvider` abstraction — GitLab/Gitea/Forgejo slot in behind the same
+interface.
 
 ```text
 /studio git setup <project> github https://github.com/you/repo
@@ -259,7 +297,8 @@ GitHub (`gh` CLI) sit behind one `RepositoryProvider` abstraction.
 
 Commits and pull requests are recorded in the local database; the reviewer's
 prompt includes the PR link. Pushing directly to protected branches is refused
-by default.
+by default. On a fresh local repo with no remote, `push` skips gracefully rather
+than failing the task.
 
 ## Plane adapter
 
@@ -268,12 +307,18 @@ An optional adapter mirrors project/task state into a Plane workspace:
 ```text
 /studio plane setup https://api.plane.so <workspace-slug> <api-key>
 /studio plane sync <project-id>
+/studio plane comments <task-id>   # push task messages as issue comments
 ```
 
 SQLite stays the source of truth; Plane is a mirror. State maps to Plane's
 default groups (Backlog / Unstarted / Started / Completed / Cancelled).
-Assignees, labels, cycles, modules, comments, and webhook ingestion are
-follow-ups.
+Assignees, labels, cycles, modules, and webhook ingestion are follow-ups.
+
+## GitHub adapter
+
+`/studio github [projectId]` reads PR and CI status for the project's GitHub
+repositories via the `gh` CLI (`GitHubClient`), and the Git provider uses `gh`
+for PR creation and merging.
 
 ## Council (multi-model synthesis)
 
@@ -302,26 +347,34 @@ parent task, dependencies, project memory, decisions, prior attempts, and
 related messages — and injects it into the agent's prompt. Extensible via
 `ContextSource`.
 
-## Live panel
+## Live panel & browser dashboard
 
-Pi Studio surfaces a live agent panel in the TUI (org/project/task counts plus
-the agent roster). It refreshes on session start, on `/studio live`, and during
-an autonomous run.
+**Live TUI panel** — org/project/task counts plus the agent roster, refreshed on
+session start, `/studio live`, and during autonomous runs.
 
-## Browser dashboard
+**Browser dashboard** — an optional local web dashboard:
 
-An optional local web dashboard (`/studio dashboard`, `/studio dashboard stop`)
-serves a read-only view of the organization at `http://127.0.0.1:<port>` — stat
-cards, color-coded agent and task tables, escalations with approve/reject, pull
-requests, recent messages, and usage. It auto-refreshes every 2 seconds and
-offers pause/resume. One self-contained HTML page + Node's built-in `http` — no
-framework, no build step, no Docker. The Pi TUI remains primary.
+```text
+/studio dashboard          # prints http://127.0.0.1:<port>
+/studio dashboard status
+/studio dashboard stop
+```
+
+It shows stat cards, color-coded agent and task tables, escalations (with
+approve/reject buttons), pull requests, recent messages, and per-project
+progress. It auto-refreshes every 2 seconds and offers pause/resume. One
+self-contained HTML page + Node's built-in `http` — no framework, no build step,
+no Docker. The Pi TUI remains primary.
 
 ## Notifications
 
 Human-relevant events surface as TUI notifications: task blocked, human decision
 needed, review needed, and task failed. Toggle them via the `notifications`
-setting (`/studio config setjson notifications '{"onBlocked":false}'`).
+setting:
+
+```text
+/studio config setjson notifications '{"onBlocked":false}'
+```
 
 ## Recovery & budgets
 
@@ -349,12 +402,14 @@ What that means in practice:
   main`, `deploy production`, `delete repository`, …) unless explicitly
   allowed, and an explicit `deny` always beats an `allow`. But policies gate
   *decisions*, not OS permissions.
-- Never paste secrets into tasks, messages, or memory — they are persisted to
-  the local SQLite database. Never store API keys in prompts.
+- **Role tool lists are enforced** — spawned agents only get the tools their
+  role allows; read-only roles cannot edit code or run bash.
+- **Protected branches are refused** by the git service, and secrets should
+  never be pasted into tasks, messages, or memory — they are persisted to the
+  local SQLite database.
 - The local database is the source of truth; treat
-  `~/.pi/agent/pi-studio/studio.db` as sensitive (it contains task content,
-  messages, and decisions). Plane/GitHub credentials are stored in the local
-  settings table, not in code.
+  `~/.pi/agent/pi-studio/studio.db` as sensitive. Plane/GitHub credentials are
+  stored in the local settings table, not in code.
 
 Report vulnerabilities as described in [SECURITY.md](./SECURITY.md).
 
@@ -370,14 +425,16 @@ npm run test:watch # watch mode
 ## Testing
 
 The suite runs against an in-memory SQLite database (`createDb(":memory:")`)
-with **mocked runtimes — no real LLM calls**. 58 tests across 18 files cover:
+with **mocked runtimes — no real LLM calls**. 74 tests across 25 files cover:
 
 - **Unit** — repository CRUD, task engine (decomposition, cycle rejection,
   readiness), scheduler (role + label filters), messaging, event bus, policies,
   memory, lifecycle transitions, runner (dev → review → QA, design routing,
-  budget pause), recovery, budget, git service (branch naming, protected
-  branches), council, skills, context assembler, Plane sync (fake client).
-- **End-to-end** — a full mocked pipeline (org → project → roles → agents →
+  budget pause, auto-merge), recovery, budget, git service (branch naming,
+  protected branches, merge) and providers, council, skills, context assembler,
+  Plane sync (fake client), dashboard server (snapshot + actions), model router
+  (auto-assign, presets, resolve fallback), tool filtering, background scheduler.
+- **End-to-end** — full mocked pipelines (org → project → roles → agents →
   plan → dependencies → scheduler loop → review → QA → `DONE`).
 
 The real `createAgentSession` runtime is wired but exercised only when you run
@@ -393,6 +450,7 @@ Pi Studio live with a configured model.
 | `node:sqlite` missing | Upgrade to Node ≥ 22.5. |
 | Role not found | Run `/studio setup` to seed roles. |
 | Agent won't start | Check `canTransition` — state changes must follow the legal transition graph in `core/orchestration/lifecycle.ts`. |
+| Agents fail with no model | Run `/studio models auto` (or `/studio models list` to confirm what's logged in). |
 | `/studio git pr` fails | A remote + pushed branch are required; local repos have no PRs. |
 | `/studio plane sync` errors | Verify base URL, workspace slug, and API key against your Plane instance (see the Plane adapter caveat in `CHANGELOG`). |
 

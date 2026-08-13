@@ -111,8 +111,10 @@
   .msg .who { color: var(--accent); }
   .msg .type { color: var(--dim); font-size: 11px; margin-left: 6px; }
   .usage { color: var(--muted); font-size: 13px; }
-  .pr { padding: 5px 0; border-bottom: 1px solid var(--panel-2); }
+  .pr { padding: 6px 0; border-bottom: 1px solid var(--panel-2); }
+  .pr .pr-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pr a { color: var(--accent); text-decoration: none; }
+  .pr .pr-meta { display: block; color: var(--dim); font-size: 11px; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -182,7 +184,7 @@ function renderTasks(d) {
   if (!d.tasks.length) { document.getElementById('tasks').innerHTML = '<div class="empty">No tasks yet.</div>'; return; }
   const rows = d.tasks.map(t =>
     '<tr><td>' + esc(t.title) + '</td><td>' + pill(t.state) + '</td>' +
-    '<td>' + esc(t.priority) + '</td><td class="id">' + shortId(t.assigneeId || '') + '</td></tr>'
+    '<td>' + esc(t.priority) + '</td><td class="id">' + (t.assigneeId ? shortId(t.assigneeId) : '—') + '</td></tr>'
   ).join('');
   document.getElementById('tasks').innerHTML =
     '<table><tr><th>Title</th><th>State</th><th>Priority</th><th>Assignee</th></tr>' + rows + '</table>';
@@ -206,8 +208,10 @@ function renderPrs(d) {
   if (!d.pullRequests.length) { document.getElementById('prs').innerHTML = '<div class="empty">No pull requests.</div>'; return; }
   document.getElementById('prs').innerHTML = d.pullRequests.map(p =>
     '<div class="pr">' +
-      (p.url ? '<a href="' + esc(p.url) + '" target="_blank">' + esc(p.title) + '</a>' : '<span>' + esc(p.title) + '</span>') +
-      ' <span class="pill">' + esc(p.state) + '</span> <span class="id">' + esc(p.branch || '') + '</span>' +
+      '<span class="pr-title">' +
+        (p.url ? '<a href="' + esc(p.url) + '" target="_blank">' + esc(p.title) + '</a>' : esc(p.title)) +
+      '</span>' +
+      '<span class="pr-meta">' + pill(p.state) + ' <span class="id">' + esc(p.branch || '') + '</span></span>' +
     '</div>'
   ).join('');
 }

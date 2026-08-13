@@ -27,10 +27,22 @@ export interface DashboardServer {
 }
 
 export function buildState(repo: StudioRepository, paused: boolean) {
+  const projects = repo.listProjects().map((p) => {
+    const tasks = repo.listTasks({ projectId: p.id });
+    return {
+      ...p,
+      metrics: {
+        tasksTotal: tasks.length,
+        tasksDone: tasks.filter((t) => t.state === "DONE").length,
+        tasksInProgress: tasks.filter((t) => t.state === "IN_PROGRESS").length,
+        tasksBlocked: tasks.filter((t) => t.state === "BLOCKED").length,
+      },
+    };
+  });
   return {
     paused,
     organizations: repo.listOrganizations(),
-    projects: repo.listProjects(),
+    projects,
     agents: repo.listAgents(),
     tasks: repo.listTasks(),
     messages: repo.listMessages().slice(-50),
