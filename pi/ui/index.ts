@@ -1,5 +1,5 @@
 /**
- * Small pure formatting helpers for Pi Studio command output (spec §6).
+ * Small pure formatting helpers for Pi Guild command output (spec §6).
  *
  * No TUI component classes here — just aligned, human-readable text.
  */
@@ -56,7 +56,7 @@ export function formatLive(studio: Studio): string {
     .join(" ") || "(none)";
 
   return [
-    "Pi Studio — live",
+    "Pi Guild — live",
     `orgs=${studio.organization.list().length} projects=${studio.project.list().length} paused=${studio.paused}`,
     `tasks: ${taskSummary}`,
     "",

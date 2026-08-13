@@ -148,7 +148,7 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
       // push/PR need a remote configured later via /studio git setup). Non-fatal:
       // if git isn't available, the team still works in the workspace.
       try {
-        const workspaceDir = join(homedir(), ".pi", "agent", "pi-studio", "workspaces", project.id);
+        const workspaceDir = join(homedir(), ".pi", "agent", "pi-guild", "workspaces", project.id);
         mkdirSync(workspaceDir, { recursive: true });
         writeFileSync(
           join(workspaceDir, "README.md"),
@@ -202,7 +202,7 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
         const project = studio.project.get(projectId);
         if (!project) return `No project with id ${projectId}`;
         if (kind === "github") {
-          const path = join(homedir(), ".pi", "agent", "pi-studio", "workspaces", projectId);
+          const path = join(homedir(), ".pi", "agent", "pi-guild", "workspaces", projectId);
           const provider = new GitHubProvider(target, path);
           await provider.clone();
           studio.git.register(projectId, { kind: "github", path, url: target });
@@ -871,7 +871,7 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
   }
 
   pi.registerCommand("studio", {
-    description: "Pi Studio: multi-agent software-development organization control",
+    description: "Pi Guild: multi-agent software-development organization control",
     handler: async (args, ctx) => {
       const tokens = args.trim().split(/\s+/).filter(Boolean);
       const sub = tokens[0] ?? "run";

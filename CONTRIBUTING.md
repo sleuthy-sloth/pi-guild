@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in Pi Studio. Keep contributions small and focused.
+Thanks for your interest in Pi Guild. Keep contributions small and focused.
 
 ## Setup
 

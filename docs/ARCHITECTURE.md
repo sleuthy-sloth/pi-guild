@@ -1,8 +1,9 @@
-# Pi Studio — Architecture
+# Pi Guild — Architecture
 
-Temporary internal name. Final public name TBD; package name kept configurable.
+Public name: **Pi Guild** (formerly developed under the internal name "Pi Studio").
+The package name is `pi-guild`.
 
-Pi Studio turns Pi into an autonomous software-development organization: a
+Pi Guild turns Pi into an autonomous software-development organization: a
 configurable hierarchy of AI agents (CEO → managers → workers), persistent
 local state, event-driven coordination, and optional integrations (GitHub,
 Plane). **Pi remains the runtime** — there is no external daemon, no parallel
@@ -16,7 +17,7 @@ agent runtime, no separate dashboard that matters.
                         Pi (runtime)
                             │
                    ┌────────┴─────────────────────────┐
-                   │   Pi Studio extension (pi/)      │   ← TUI, commands, tools
+                   │   Pi Guild extension (pi/)      │   ← TUI, commands, tools
                    │                                  │
                    │   ┌──────────────────────────┐   │
                    │   │  Core engine (core/)     │   │
@@ -159,7 +160,7 @@ availability, budget/concurrency limits, project policy. Output: which
 ## 6. Package structure
 
 ```
-pi-studio/
+pi-guild/
 ├── package.json          # "pi" manifest → extensions: ["./pi/index.ts"]
 ├── tsconfig.json
 ├── README.md  LICENSE  CHANGELOG.md  CONTRIBUTING.md  SECURITY.md  CODE_OF_CONDUCT.md

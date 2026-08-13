@@ -1,5 +1,5 @@
 /**
- * Core domain types for Pi Studio.
+ * Core domain types for Pi Guild.
  *
  * These types are the shared contract between the persistence layer
  * (core/repository.ts), the domain services (core/*), the orchestration

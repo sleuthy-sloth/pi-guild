@@ -1,9 +1,9 @@
 /**
- * PlaneSyncService — mirrors Pi Studio project/task state into Plane (spec §35).
+ * PlaneSyncService — mirrors Pi Guild project/task state into Plane (spec §35).
  *
  * SQLite remains the source of truth; Plane is an optional mirror. Project and
  * issue mappings are stored in the settings table (no schema change). State is
- * mapped from Pi Studio task states to Plane's default state names.
+ * mapped from Pi Guild task states to Plane's default state names.
  */
 import type { StudioRepository } from "../../core/repository.ts";
 import type { TaskState } from "../../core/types.ts";
@@ -30,7 +30,7 @@ export class PlaneSyncService {
     return PlaneSyncService.readConfig(this.repo) !== undefined;
   }
 
-  /** Map a Pi Studio task state to a Plane state name (default Plane groups). */
+  /** Map a Pi Guild task state to a Plane state name (default Plane groups). */
   mapState(state: TaskState): string {
     switch (state) {
       case "BACKLOG":
@@ -68,7 +68,7 @@ export class PlaneSyncService {
     this.repo.setSettingJson(`planeIssues:${projectId}`, map);
   }
 
-  /** Find (by name) or create the Plane project for a Pi Studio project. */
+  /** Find (by name) or create the Plane project for a Pi Guild project. */
   async ensureProject(projectId: string): Promise<PlaneProject> {
     const mapping = this.projectMap();
     const mapped = mapping[projectId];

@@ -42,7 +42,7 @@ export class EventBus {
     for (const handler of [...set]) {
       // Fire-and-forget; handlers must not throw.
       void Promise.resolve(handler(event)).catch((err) => {
-        console.error(`[pi-studio] event handler for "${type}" failed:`, err);
+        console.error(`[pi-guild] event handler for "${type}" failed:`, err);
       });
     }
   }

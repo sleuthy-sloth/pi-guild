@@ -1,5 +1,5 @@
 /**
- * Lazy singleton for the Pi Studio extension (spec §54).
+ * Lazy singleton for the Pi Guild extension (spec §54).
  *
  * Commands and tools share one in-memory instance: a single SQLite connection,
  * one repository, one set of domain services, and the shared event bus. Nothing

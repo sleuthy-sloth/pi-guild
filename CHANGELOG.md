@@ -1,8 +1,16 @@
 # Changelog
 
-All notable changes to Pi Studio are documented in this file.
+All notable changes to Pi Guild are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.11.0] - unreleased
+
+### Changed
+
+- **Renamed to Pi Guild** (formerly "Pi Studio"). Package is now `pi-guild`; the
+  data directory moved to `~/.pi/agent/pi-guild/`. The `/studio` command
+  namespace and `studio_*` tools keep their names.
 
 ## [0.10.0] - unreleased
 

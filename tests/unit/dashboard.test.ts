@@ -26,7 +26,7 @@ describe("dashboard server", () => {
 
     try {
       const html = await (await fetch(`${server.url}/`)).text();
-      expect(html).toContain("Pi Studio");
+      expect(html).toContain("Pi Guild");
 
       const state = (await (await fetch(`${server.url}/api/state`)).json()) as {
         paused: boolean;

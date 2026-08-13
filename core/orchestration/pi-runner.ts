@@ -68,12 +68,12 @@ export function resolveRoleTools(
 }
 
 function defaultWorkspaceDir(projectId: string): string {
-  return join(homedir(), ".pi", "agent", "pi-studio", "workspaces", projectId);
+  return join(homedir(), ".pi", "agent", "pi-guild", "workspaces", projectId);
 }
 
 function buildSystemPrompt(role: AgentRole | undefined, agent: Agent, skillsText?: string): string {
   const lines: string[] = [];
-  lines.push(`You are ${agent.name}, a Pi Studio agent acting in the "${agent.roleName}" role.`);
+  lines.push(`You are ${agent.name}, a Pi Guild agent acting in the "${agent.roleName}" role.`);
   if (role?.systemPrompt) {
     lines.push("");
     lines.push(role.systemPrompt);

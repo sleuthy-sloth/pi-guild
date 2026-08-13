@@ -1,5 +1,5 @@
 /**
- * Pi Studio extension entry point (spec §6, §54).
+ * Pi Guild extension entry point (spec §6, §54).
  *
  * The factory only wires lifecycle handlers — it never opens the database or
  * starts background work. The database and services are constructed lazily on

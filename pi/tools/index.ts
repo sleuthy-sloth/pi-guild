@@ -1,5 +1,5 @@
 /**
- * Pi Studio LLM-callable tools (spec §6, §54).
+ * Pi Guild LLM-callable tools (spec §6, §54).
  *
  * `createStudioToolDefinitions(studio)` returns plain ToolDefinitions shared by
  * the extension (pi.registerTool) and by spawned agent sessions (customTools),
@@ -154,7 +154,7 @@ export function createStudioToolDefinitions(studio: Studio): ToolDefinition[] {
 
   // Projects
   defs.push(
-    tool("studio_list_projects", "List Projects", "List all Pi Studio projects.", Type.Object({}), () => {
+    tool("studio_list_projects", "List Projects", "List all Pi Guild projects.", Type.Object({}), () => {
       const projects = studio.project.list();
       return { text: projectsText(), details: { projects } };
     }),

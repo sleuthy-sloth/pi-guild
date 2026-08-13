@@ -1,5 +1,5 @@
 {
-  "name": "pi-studio",
+  "name": "pi-guild",
   "version": "0.1.0",
   "description": "Turn Pi into an autonomous multi-agent software-development organization. Native Pi runtime, local-first, SQLite persistence.",
   "license": "MIT",

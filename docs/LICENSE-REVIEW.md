@@ -1,11 +1,11 @@
 # License & Dependency Review
 
-Recorded 2025. Purpose: verify Pi Studio can be published under MIT with no
+Recorded 2025. Purpose: verify Pi Guild can be published under MIT with no
 license-incompatible dependencies (spec §48).
 
 ## Runtime dependency surface
 
-Pi Studio declares **zero runtime dependencies of its own**. Its only imports
+Pi Guild declares **zero runtime dependencies of its own**. Its only imports
 at runtime are:
 
 | Package | Role | License | Note |

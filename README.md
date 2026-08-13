@@ -1,8 +1,8 @@
-# Pi Studio
+# Pi Guild
 
 > **Turn Pi into an autonomous multi-agent software-development organization.**
 
-Pi Studio is a TypeScript extension package for the [Pi coding agent] that models
+Pi Guild is a TypeScript extension package for the [Pi coding agent] that models
 your work the way a small software company does: a configurable hierarchy of AI
 agents (CEO → managers → workers), persistent local state, event-driven
 coordination, and dependency-gated task scheduling. **Pi remains the runtime** —
@@ -10,9 +10,33 @@ there is no external daemon, no parallel agent runtime, and no separate
 dashboard that matters. Everything runs inside Pi, and every durable fact lives
 in a local SQLite database.
 
-Pi Studio is **local-first** and **offline by default**. Agents run with full
+Pi Guild is **local-first** and **offline by default**. Agents run with full
 system permissions (see [Security](#security-model)); treat the workspace and
 model providers you grant as trusted boundaries.
+
+```
+      ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+      █  ╔══════════════════════╗        █
+      █  ║   ✦  PI GUILD  ✦   ║        █
+      █  ╚══════════════════════╝        █
+      █        _________________         █
+      █       /                 \        █
+      █      /   ╔═══════════╗   \       █
+      █     |    ║  GUILD    ║    |      █
+      █     |    ║  HALL     ║    |      █
+      █     |    ╚═══════════╝    |      █
+      █     |     ___________     |      █
+      █     |    |  ★  ★  ★  |    |      █
+      █     |    |___________|    |      █
+      █      \_________________/        █
+      █       |   |   |   |   |         █
+      █       |   |   |   |   |         █
+      ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+```
+
+Welcome to the guild. The Craftmaster (CEO), the Stewards (managers), and the
+Journeymen (developers, reviewers, QA, designers) all work here — and the
+foreman is always in.
 
 ---
 
@@ -55,7 +79,7 @@ model providers you grant as trusted boundaries.
                         Pi (runtime)
                             │
                    ┌────────┴─────────────────────────┐
-                   │   Pi Studio extension (pi/)      │   ← /studio commands, studio_* tools
+                   │   Pi Guild extension (pi/)      │   ← /studio commands, studio_* tools
                    │                                  │
                    │   ┌──────────────────────────┐   │
                    │   │  Core engine (core/)     │   │
@@ -107,13 +131,13 @@ Requires **Node ≥ 22.5** (for the built-in `node:sqlite`). Install the package
 from npm:
 
 ```bash
-pi install npm:pi-studio
+pi install npm:pi-guild
 ```
 
 For local development, install straight from a checkout:
 
 ```bash
-git clone <your-fork> pi-studio && cd pi-studio
+git clone <your-fork> pi-guild && cd pi-guild
 npm install
 pi install .            # local-path install; reloads pick up source changes
 ```
@@ -131,7 +155,7 @@ packages. The database is `node:sqlite`, part of the Node standard library.
 /studio setup
 ```
 
-This creates the local database at `~/.pi/agent/pi-studio/studio.db`, seeds the
+This creates the local database at `~/.pi/agent/pi-guild/studio.db`, seeds the
 nine agent roles and the default policy set, then asks how you want to route
 models:
 
@@ -151,7 +175,7 @@ and quality profile (see [Model routing](#model-routing)).
 ```
 
 Answer the prompts: what to build, the project name, and the approval policy.
-Pi Studio then:
+Pi Guild then:
 
 1. Creates the organization/project/goal.
 2. Initializes a local git repository in the project workspace.
@@ -196,7 +220,7 @@ truth.
 roster, updated live during runs:
 
 ```text
-Pi Studio — live
+Pi Guild — live
 orgs=1 projects=1 paused=false
 tasks: DONE=1 IN_PROGRESS=1 REVIEW=1 QA=1 BACKLOG=1
 
@@ -215,7 +239,7 @@ reviewer   Reviewer   REVIEWING  a4106543
 auto-refreshing web view with color-coded statuses, escalation approve/reject,
 and per-project progress:
 
-![Pi Studio dashboard](docs/screenshots/dashboard.png)
+![Pi Guild dashboard](docs/screenshots/dashboard.png)
 
 **Command output** is aligned and id-truncated. A team mid-run looks like this:
 
@@ -384,7 +408,7 @@ for PR creation and merging.
 
 ## Council (multi-model synthesis)
 
-Pi Studio can run one question through several models in parallel and synthesize
+Pi Guild can run one question through several models in parallel and synthesize
 a consensus — inspired by oh-my-opencode-slim's "Council". Configure the
 member list, then deliberate:
 
@@ -440,7 +464,7 @@ setting:
 
 ## Recovery & budgets
 
-Pi Studio reconciles on startup: agents left `WORKING`/`STARTING`/`REVIEWING`
+Pi Guild reconciles on startup: agents left `WORKING`/`STARTING`/`REVIEWING`
 from a previous session are reset to `IDLE`, and interrupted `IN_PROGRESS` tasks
 are reopened to `READY` — work is never blindly resumed. Run `/studio recover`
 to reconcile manually.
@@ -451,13 +475,13 @@ of `continue`, `pause`, or `escalate`.
 
 ## Security model
 
-Agents in Pi Studio run with the **same full system permissions as Pi itself**:
-they can read, write, and execute anything the host user can. Pi Studio does not
+Agents in Pi Guild run with the **same full system permissions as Pi itself**:
+they can read, write, and execute anything the host user can. Pi Guild does not
 sandbox agents.
 
 What that means in practice:
 
-- Only install Pi Studio and grant it model access if you trust the workspace
+- Only install Pi Guild and grant it model access if you trust the workspace
   and the model provider.
 - **Policies are a guardrail, not a sandbox.** The policy engine
   (`PolicyService.can`) blocks *dangerous-by-default* actions (`merge into
@@ -470,7 +494,7 @@ What that means in practice:
   never be pasted into tasks, messages, or memory — they are persisted to the
   local SQLite database.
 - The local database is the source of truth; treat
-  `~/.pi/agent/pi-studio/studio.db` as sensitive. Plane/GitHub credentials are
+  `~/.pi/agent/pi-guild/studio.db` as sensitive. Plane/GitHub credentials are
   stored in the local settings table, not in code.
 
 Report vulnerabilities as described in [SECURITY.md](./SECURITY.md).
@@ -500,7 +524,7 @@ with **mocked runtimes — no real LLM calls**. 74 tests across 25 files cover:
   plan → dependencies → scheduler loop → review → QA → `DONE`).
 
 The real `createAgentSession` runtime is wired but exercised only when you run
-Pi Studio live with a configured model.
+Pi Guild live with a configured model.
 
 ## Troubleshooting
 
