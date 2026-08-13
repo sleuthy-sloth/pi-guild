@@ -14,3 +14,4 @@ export { Council, type CouncilMember, type CouncilResult, type CouncilResponder 
 export { createCouncilResponder } from "./council-runner.ts";
 export { RecoveryService, type RecoveryReport } from "./recovery.ts";
 export { BudgetService } from "./budget.ts";
+export { BackgroundScheduler, type BackgroundOptions } from "./background.ts";

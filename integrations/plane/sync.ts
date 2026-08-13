@@ -129,4 +129,18 @@ export class PlaneSyncService {
     const planeProject = await this.ensureProject(task.projectId);
     await this.client.updateIssue(planeProject.id, issueId, { state: this.mapState(task.state) });
   }
+
+  /** Push a task's messages to Plane as issue comments. */
+  async pushComments(taskId: string): Promise<number> {
+    const task = this.repo.getTask(taskId);
+    if (!task) throw new Error(`task not found: ${taskId}`);
+    const issueId = this.issueMap(task.projectId)[taskId];
+    if (!issueId) return 0;
+    const planeProject = await this.ensureProject(task.projectId);
+    const messages = this.repo.listMessages({ taskId });
+    for (const message of messages) {
+      await this.client.addComment(planeProject.id, issueId, `[${message.senderName}] ${message.content}`);
+    }
+    return messages.length;
+  }
 }

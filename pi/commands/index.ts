@@ -10,14 +10,24 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { StudioEvents } from "../../core/events.ts";
 import { defaultDbPath } from "../../database/db.ts";
-import { ProjectRunner, RecoveryService, type ReviewPolicy } from "../../core/orchestration/index.ts";
+import { BackgroundScheduler, ProjectRunner, RecoveryService, type ReviewPolicy } from "../../core/orchestration/index.ts";
 import { GitHubProvider, LocalGitProvider } from "../../integrations/git/index.ts";
 import { HttpPlaneClient, PlaneSyncService } from "../../integrations/plane/index.ts";
+import { GitHubClient } from "../../integrations/github/index.ts";
 import { currentOrgId } from "../state.ts";
 import type { Studio } from "../state.ts";
 import { formatAgents, formatLive, formatTasks } from "../ui/index.ts";
 
 type Handler = (rest: string[], ctx: ExtensionCommandContext) => Promise<string>;
+
+function formatUsage(s: {
+  totalCalls: number;
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  totalElapsedMs: number;
+}): string {
+  return `${s.totalCalls} calls, ${s.totalPromptTokens + s.totalCompletionTokens} tokens, ${Math.round(s.totalElapsedMs / 1000)}s`;
+}
 
 const HELP = [
   "usage: /studio <subcommand> [args]",
@@ -27,7 +37,7 @@ const HELP = [
   "  bg [<role> <prompt>]           fire-and-forget background job",
   "  live                          refresh the live agent panel",
   "  git setup <project> local <path> | github <url>",
-  "  git branch|commit|push|pr|log <taskId>",
+  "  git branch|commit|push|pr|merge|log <taskId>",
   "  status                        org/project/agent/task counts + paused flag",
   "  setup                         wizard: create org + seed default policies",
   "  org [create <name> | use <id>]",
@@ -39,13 +49,16 @@ const HELP = [
   "  policies                      list policies",
   "  doctor                        DB path, counts, integrations, settings",
   "  logs [N]                      last N audit entries",
+  "  config [get <key> | set <key> <value> | setjson <key> <json>]",
+  "  usage [projectId]             token/call/time usage",
   "  pause | resume                flip the scheduler pause flag",
   "  recover                       reset orphaned agents/tasks (also runs on start)",
-  "  stop <agentId> | stop project <id>",
+  "  stop <agentId> | stop project <id> | stop",
   "  approve <id> | reject <id>    resolve a human escalation",
   "  escalate                      create a human escalation",
-  "  start                         (stub) background scheduler not implemented",
-  "  plane | github                (stub) not configured / later milestone",
+  "  start                         start the background scheduler loop",
+  "  plane setup <baseUrl> <slug> <apiKey> | status | sync [project] | comments <taskId>",
+  "  github [projectId]            PR / CI status via gh",
 ].join("\n");
 
 export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
@@ -116,6 +129,8 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
         projectId: project.id,
         reviewPolicy,
         paused: () => studio.paused,
+        merge: (t) => studio.git.merge(t),
+        autoMerge: reviewPolicy !== "manual_merge",
         onProgress: (m) => {
           ctx.ui.notify(m, "info");
           refreshLive(ctx);
@@ -180,6 +195,11 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
         const task = requireTask(args[0]);
         const pr = await studio.git.openPullRequest(task);
         return `PR ${pr.url ?? pr.number}`;
+      }
+      if (verb === "merge") {
+        const task = requireTask(args[0]);
+        await studio.git.merge(task);
+        return `Merged ${task.branch ?? "branch"}`;
       }
       if (verb === "log") {
         const task = requireTask(args[0]);
@@ -414,6 +434,51 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
       return policies.map((p) => `${p.id}  ${p.kind.toUpperCase()}  ${p.target}`).join("\n");
     },
 
+    async config(rest): Promise<string> {
+      if (rest.length === 0) {
+        const settings = studio.repo.allSettings();
+        return Object.keys(settings).length === 0
+          ? "(no settings)"
+          : Object.entries(settings)
+              .map(([k, v]) => `${k} = ${v}`)
+              .join("\n");
+      }
+      if (rest[0] === "get") {
+        const value = studio.repo.getSetting(rest[1]);
+        return value === undefined ? `(unset) ${rest[1]}` : `${rest[1]} = ${value}`;
+      }
+      if (rest[0] === "set") {
+        const [key, ...valueParts] = rest.slice(1);
+        const value = valueParts.join(" ");
+        if (!key || !value) return "usage: /studio config set <key> <value>";
+        studio.repo.setSetting(key, value);
+        return `Set ${key}.`;
+      }
+      if (rest[0] === "setjson") {
+        const [key, ...jsonParts] = rest.slice(1);
+        const json = jsonParts.join(" ");
+        if (!key || !json) return "usage: /studio config setjson <key> <json>";
+        try {
+          studio.repo.setSettingJson(key, JSON.parse(json));
+        } catch {
+          return `Invalid JSON for ${key}.`;
+        }
+        return `Set ${key} (json).`;
+      }
+      return "usage: /studio config [get <key> | set <key> <value> | setjson <key> <json>]";
+    },
+
+    async usage(rest): Promise<string> {
+      if (rest[0]) {
+        return formatUsage(studio.repo.usageStats({ projectId: rest[0] }));
+      }
+      const lines = [`Total: ${formatUsage(studio.repo.usageStats())}`];
+      for (const p of studio.project.list()) {
+        lines.push(`${p.name}: ${formatUsage(studio.repo.usageStats({ projectId: p.id }))}`);
+      }
+      return lines.join("\n");
+    },
+
     async doctor(): Promise<string> {
       const orgs = studio.repo.listOrganizations().length;
       const projects = studio.repo.listProjects().length;
@@ -473,7 +538,12 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
     },
 
     async stop(rest): Promise<string> {
-      if (rest.length === 0) return "usage: /studio stop <agentId> | stop project <id>";
+      if (rest.length === 0) {
+        if (!studio.background?.isRunning()) return "Background scheduler not running.";
+        studio.background.stop();
+        studio.background = undefined;
+        return "Background scheduler stopped.";
+      }
       if (rest[0] === "project") {
         const id = rest[1];
         if (!id) return "usage: /studio stop project <id>";
@@ -522,7 +592,22 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
     },
 
     async start(): Promise<string> {
-      return "background scheduler not implemented yet";
+      if (studio.background?.isRunning()) return "Background scheduler already running.";
+      studio.background = new BackgroundScheduler(
+        studio.repo,
+        (projectId) => {
+          const runner = new ProjectRunner(studio.repo, studio.bus, studio.spawner);
+          return runner.runProject({
+            projectId,
+            reviewPolicy: "review_and_tests_required",
+            paused: () => studio.paused,
+            merge: (t) => studio.git.merge(t),
+          });
+        },
+        { pollMs: 2000, paused: () => studio.paused },
+      );
+      studio.background.start();
+      return "Background scheduler started. /studio stop to halt.";
     },
 
     async plane(rest): Promise<string> {
@@ -554,11 +639,39 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
         }
         return lines.join("\n");
       }
-      return "usage: /studio plane setup|status|sync [projectId]";
+      if (verb === "comments") {
+        const config = PlaneSyncService.readConfig(studio.repo);
+        if (!config) return "Plane not configured.";
+        const sync = new PlaneSyncService(studio.repo, new HttpPlaneClient(config));
+        const count = await sync.pushComments(args[0]);
+        return `Pushed ${count} comment(s).`;
+      }
+      return "usage: /studio plane setup|status|sync [projectId]|comments <taskId>";
     },
 
-    async github(): Promise<string> {
-      return "not configured / later milestone";
+    async github(rest): Promise<string> {
+      const projectId = rest[0];
+      const repos = projectId ? studio.repo.listRepositories(projectId) : studio.repo.listRepositories();
+      const ghRepos = repos.filter((r) => r.kind === "github");
+      if (ghRepos.length === 0) {
+        return "No GitHub repositories configured. /studio git setup <project> github <url>";
+      }
+      const lines: string[] = [];
+      for (const repo of ghRepos) {
+        if (!repo.path) continue;
+        const client = new GitHubClient(repo.path);
+        const info = await client.repoInfo();
+        const prs = await client.listPullRequests();
+        const runs = await client.listRuns();
+        lines.push(`${info.nameWithOwner ?? "unknown"} (project ${repo.projectId})`);
+        lines.push(
+          `  PRs: ${prs.length ? prs.map((p) => `#${p.number} ${p.state} ${p.headRefName}`).join(", ") : "none"}`,
+        );
+        lines.push(
+          `  CI: ${runs.length ? runs.map((r) => `${r.name}:${r.status}${r.conclusion ? "/" + r.conclusion : ""}`).join(", ") : "none"}`,
+        );
+      }
+      return lines.join("\n");
     },
 
     async help(): Promise<string> {

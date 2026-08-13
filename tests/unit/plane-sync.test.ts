@@ -33,6 +33,9 @@ class FakePlaneClient implements PlaneClient {
   async listStates() {
     return [];
   }
+  async addComment(_projectId: string, _issueId: string, _commentHtml: string) {
+    return { id: "comment-1" };
+  }
 }
 
 describe("PlaneSyncService", () => {

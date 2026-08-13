@@ -43,6 +43,7 @@ export interface PlaneClient {
   ): Promise<PlaneIssue>;
   updateIssue(projectId: string, issueId: string, patch: Record<string, unknown>): Promise<PlaneIssue>;
   listStates(projectId: string): Promise<PlaneState[]>;
+  addComment(projectId: string, issueId: string, commentHtml: string): Promise<unknown>;
 }
 
 export class HttpPlaneClient implements PlaneClient {
@@ -98,5 +99,9 @@ export class HttpPlaneClient implements PlaneClient {
 
   listStates(projectId: string): Promise<PlaneState[]> {
     return this.request("GET", `/projects/${projectId}/states/`);
+  }
+
+  addComment(projectId: string, issueId: string, commentHtml: string): Promise<unknown> {
+    return this.request("POST", `/projects/${projectId}/issues/${issueId}/comments/`, { comment_html: commentHtml });
   }
 }

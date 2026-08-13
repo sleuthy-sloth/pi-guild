@@ -39,6 +39,7 @@ export interface RepositoryProvider {
     title: string;
     body: string;
   }): Promise<{ url: string; number: number }>;
+  mergePullRequest(opts: { base: string; head: string }): Promise<void>;
 }
 
 export class LocalGitProvider implements RepositoryProvider {
@@ -93,6 +94,10 @@ export class LocalGitProvider implements RepositoryProvider {
   }): Promise<{ url: string; number: number }> {
     throw new Error("local repositories have no pull requests — configure a GitHub repository");
   }
+
+  async mergePullRequest(_opts: { base: string; head: string }): Promise<void> {
+    throw new Error("local repositories have no pull requests — configure a GitHub repository");
+  }
 }
 
 export class GitHubProvider extends LocalGitProvider {
@@ -124,6 +129,10 @@ export class GitHubProvider extends LocalGitProvider {
     const url = (stdout.trim().split("\n").pop() ?? "").trim();
     const match = url.match(/\/pull\/(\d+)/);
     return { url, number: match ? Number(match[1]) : 0 };
+  }
+
+  async mergePullRequest(opts: { base: string; head: string }): Promise<void> {
+    await this.run("gh", ["pr", "merge", opts.head, "--merge"], this.path);
   }
 }
 

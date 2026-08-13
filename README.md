@@ -81,9 +81,10 @@ Pi's SDK `createAgentSession()` — its own `cwd` (project workspace), `model`,
 scheduler decides *which* run, *when*, and *why*. There are no persistent
 manager processes: management runs in ephemeral sessions triggered by events.
 
-**No background daemon.** Nothing is started from the extension factory.
-Background scheduling, if enabled, is an explicit `/studio start` that spawns a
-bounded scheduler loop and is torn down on `/studio stop` and `session_shutdown`.
+**No background daemon.** Nothing is started from the extension factory. The
+background scheduler is an explicit, started component — `/studio start` spawns
+a bounded loop that continuously runs ready work across projects, and
+`/studio stop` (or `session_shutdown`) tears it down.
 
 ---
 
@@ -183,12 +184,14 @@ All commands live under the `/studio` namespace:
 | `/studio bg <role> <prompt>` | fire-and-forget background job |
 | `/studio live` | refresh the live agent panel |
 | `/studio git setup <project> local <path>` / `github <url>` | register a repository |
-| `/studio git branch` / `commit` / `push` / `pr` / `log <taskId>` | the git workflow |
-| `/studio plane setup <baseUrl> <slug> <apiKey>` / `status` / `sync [projectId]` | Plane mirror |
+| `/studio git branch` / `commit` / `push` / `pr` / `merge` / `log <taskId>` | the git workflow |
+| `/studio plane setup <baseUrl> <slug> <apiKey>` / `status` / `sync [projectId]` / `comments <taskId>` | Plane mirror |
+| `/studio config [get <key>` / `set <key> <value>` / `setjson <key> <json>]` | read/write settings |
+| `/studio usage [projectId]` | token/call/time usage |
 | `/studio doctor` | DB path, counts, integrations, settings |
 | `/studio logs [N]` | last N audit entries |
-| `/studio github` | stub — deeper GitHub sync (later milestone) |
-| `/studio start` | stub — background scheduler loop (later milestone) |
+| `/studio github [projectId]` | PR / CI status via `gh` |
+| `/studio start` / `stop` | start / stop the background scheduler loop |
 
 The same surface is available to agents as 33 `studio_*` tools
 (`studio_list_tasks`, `studio_create_task`, `studio_decompose_task`,
@@ -230,6 +233,7 @@ GitHub (`gh` CLI) sit behind one `RepositoryProvider` abstraction.
 /studio git commit <taskId> "Implement X"
 /studio git push <taskId>
 /studio git pr <taskId>          # open a pull request
+/studio git merge <taskId>       # merge the PR (auto unless manual_merge)
 ```
 
 Commits and pull requests are recorded in the local database; the reviewer's
@@ -282,6 +286,12 @@ related messages — and injects it into the agent's prompt. Extensible via
 Pi Studio surfaces a live agent panel in the TUI (org/project/task counts plus
 the agent roster). It refreshes on session start, on `/studio live`, and during
 an autonomous run.
+
+## Notifications
+
+Human-relevant events surface as TUI notifications: task blocked, human decision
+needed, review needed, and task failed. Toggle them via the `notifications`
+setting (`/studio config setjson notifications '{"onBlocked":false}'`).
 
 ## Recovery & budgets
 

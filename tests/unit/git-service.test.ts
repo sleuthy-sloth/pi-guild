@@ -9,6 +9,7 @@ class FakeProvider implements RepositoryProvider {
   commits: string[] = [];
   pushes: string[] = [];
   prs: Array<{ base: string; head: string; title: string; body: string }> = [];
+  merges: string[] = [];
 
   async createBranch(branch: string) {
     this.branches.push(branch);
@@ -30,6 +31,9 @@ class FakeProvider implements RepositoryProvider {
   async createPullRequest(opts: { base: string; head: string; title: string; body: string }) {
     this.prs.push(opts);
     return { url: "https://github.com/o/r/pull/1", number: 1 };
+  }
+  async mergePullRequest(_opts: { base: string; head: string }) {
+    this.merges.push(_opts.head);
   }
 }
 
@@ -99,5 +103,17 @@ describe("GitService", () => {
     await expect(service.commit(task, "bad")).rejects.toThrow(/protected/);
     await expect(service.push(task)).rejects.toThrow(/protected/);
     await expect(service.openPullRequest(task)).rejects.toThrow(/protected/);
+  });
+
+  it("merge calls the provider and marks the PR merged", async () => {
+    const { repo, proj, fake, service, repository } = setup();
+    const task = repo.createTask({ title: "Add login page", projectId: proj.id });
+    await service.startBranch(task);
+    await service.openPullRequest(task);
+
+    await service.merge(task);
+
+    expect(fake.merges).toContain("feature/x");
+    expect(repo.listPullRequests(repository.id)[0].state).toBe("merged");
   });
 });

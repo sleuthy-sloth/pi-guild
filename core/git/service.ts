@@ -158,4 +158,26 @@ export class GitService {
     const clean = await provider.isClean();
     return { branch, clean };
   }
+
+  async merge(task: Task): Promise<void> {
+    const { repository, provider } = this.require(task.projectId);
+    const branch = task.branch ?? (await provider.currentBranch());
+    if (this.isProtected(repository, branch)) {
+      throw new Error(`refusing to merge protected branch ${branch}`);
+    }
+    await provider.mergePullRequest({ base: repository.defaultBranch ?? "main", head: branch });
+    const pr = this.repo
+      .listPullRequests(repository.id)
+      .filter((p) => p.branch === branch)
+      .at(-1);
+    if (pr) this.repo.updatePullRequest(pr.id, { state: "merged" });
+    this.repo.audit({
+      actor: "git",
+      action: "git.merge",
+      entityType: "task",
+      entityId: task.id,
+      details: { branch },
+    });
+    this.repo.recordEvent("pr.merged", { taskId: task.id, branch });
+  }
 }

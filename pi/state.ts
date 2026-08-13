@@ -24,6 +24,7 @@ import { TaskService } from "../core/tasks/index.ts";
 import { MessagingService } from "../core/messaging/index.ts";
 import {
   AgentSpawner,
+  BackgroundScheduler,
   Council,
   createCouncilResponder,
   createPiRunner,
@@ -54,6 +55,8 @@ export interface Studio {
   spawner: AgentSpawner;
   council: Council;
   git: GitService;
+  /** Created on `/studio start`; torn down on shutdown. */
+  background?: BackgroundScheduler;
   paused: boolean;
 }
 
@@ -100,6 +103,7 @@ export function getStudio(): Studio {
     spawner: null as unknown as AgentSpawner,
     council,
     git,
+    background: undefined,
     paused: false,
   };
 
@@ -132,6 +136,7 @@ export function getStudio(): Studio {
 
 export function resetStudio(): void {
   if (!memo) return;
+  memo.background?.stop();
   try {
     memo.db.close();
   } catch {

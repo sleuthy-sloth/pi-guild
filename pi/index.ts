@@ -12,8 +12,10 @@ import { getStudio, resetStudio } from "./state.ts";
 import { registerStudioCommand } from "./commands/index.ts";
 import { registerStudioTools, STUDIO_TOOL_NAMES } from "./tools/index.ts";
 import { formatLive } from "./ui/index.ts";
+import { installNotifications } from "./notifications.ts";
 
 let wired = false;
+let removeNotifications: (() => void) | undefined;
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
@@ -29,9 +31,16 @@ export default function (pi: ExtensionAPI) {
     pi.setActiveTools([...new Set([...active, ...STUDIO_TOOL_NAMES])]);
 
     if (ctx.hasUI) ctx.ui.setWidget("studio-live", formatLive(studio).split("\n"));
+
+    removeNotifications?.();
+    removeNotifications = installNotifications({ repo: studio.repo, bus: studio.bus }, (message, kind) =>
+      ctx.ui.notify(message, kind),
+    );
   });
 
   pi.on("session_shutdown", () => {
+    removeNotifications?.();
+    removeNotifications = undefined;
     resetStudio();
   });
 }

@@ -83,6 +83,7 @@ export const STUDIO_TOOL_NAMES = [
   "studio_git_push",
   "studio_git_pull_request",
   "studio_git_status",
+  "studio_git_merge",
 ] as const;
 
 function tool<T extends TSchema>(
@@ -484,6 +485,12 @@ export function createStudioToolDefinitions(studio: Studio): ToolDefinition[] {
       if (!task) throw new Error(`task not found: ${params.taskId}`);
       const status = await studio.git.status(task);
       return { text: `branch=${status.branch} clean=${status.clean}`, details: status };
+    }),
+    tool("studio_git_merge", "Merge Pull Request", "Merge a task's pull request into its base branch.", Type.Object({ taskId: Type.String() }), async (params) => {
+      const task = studio.tasks.get(params.taskId);
+      if (!task) throw new Error(`task not found: ${params.taskId}`);
+      await studio.git.merge(task);
+      return { text: `Merged ${task.branch ?? "branch"}`, details: { branch: task.branch } };
     }),
   );
 

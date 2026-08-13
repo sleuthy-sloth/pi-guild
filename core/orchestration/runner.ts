@@ -31,6 +31,10 @@ export interface RunOptions {
   signal?: AbortSignal;
   /** Consulted every pass; returns true while the user has paused the studio. */
   paused?: () => boolean;
+  /** Called to merge a task's PR once it reaches DONE (unless manual_merge). */
+  merge?: (task: Task) => Promise<void>;
+  /** Defaults to reviewPolicy !== "manual_merge". */
+  autoMerge?: boolean;
 }
 
 export interface RunSummary {
@@ -174,10 +178,11 @@ export class ProjectRunner {
   }
 
   async runProject(opts: RunOptions): Promise<RunSummary> {
-    const { projectId, reviewPolicy = "review_and_tests_required", onProgress, signal } = opts;
+    const { projectId, reviewPolicy = "review_and_tests_required", onProgress, signal, merge, autoMerge } = opts;
     const paused = opts.paused ?? (() => false);
     const needsReview = reviewPolicy === "review_required" || reviewPolicy === "review_and_tests_required";
     const needsQa = reviewPolicy === "review_and_tests_required";
+    const shouldMerge = autoMerge ?? reviewPolicy !== "manual_merge";
 
     let iterations = 0;
     let cancelled = 0;
@@ -185,6 +190,16 @@ export class ProjectRunner {
     const report = (m: string) => {
       onProgress?.(m);
       this.bus.emit("runner.progress", { projectId, message: m });
+    };
+    const maybeMerge = async (taskId: string) => {
+      if (!shouldMerge || !merge) return;
+      const fresh = this.repo.getTask(taskId);
+      if (!fresh || fresh.state !== "DONE" || !fresh.pr) return;
+      try {
+        await merge(fresh);
+      } catch (err) {
+        report(`Merge failed for ${taskId}: ${err instanceof Error ? err.message : String(err)}`);
+      }
     };
 
     // ponytail: unbounded retry loop bounded only by the iteration cap; add a
@@ -238,6 +253,7 @@ export class ProjectRunner {
         for (const { task } of dev) {
           if (this.enforceBudget(projectId, task.id, report) === "paused") budgetPaused = true;
         }
+        if (!needsReview) for (const { task } of dev) await maybeMerge(task.id);
         if (budgetPaused) break;
         continue;
       }
@@ -258,6 +274,7 @@ export class ProjectRunner {
             });
             const verdict = this.newVerdict(task.id, beforeId) ?? (res.ok ? "approve" : "request_changes");
             if (verdict === "request_changes") this.reopen(task.id);
+            if (!needsQa) await maybeMerge(task.id);
             if (this.enforceBudget(projectId, task.id, report) === "paused") budgetPaused = true;
           }
           if (budgetPaused) break;
@@ -281,6 +298,7 @@ export class ProjectRunner {
             });
             const verdict = this.newVerdict(task.id, beforeId) ?? (res.ok ? "pass" : "fail");
             if (verdict === "fail") this.reopen(task.id);
+            await maybeMerge(task.id);
             if (this.enforceBudget(projectId, task.id, report) === "paused") budgetPaused = true;
           }
           if (budgetPaused) break;

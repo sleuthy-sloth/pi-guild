@@ -4,6 +4,24 @@ All notable changes to Pi Studio are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - unreleased
+
+### Added
+
+- **Merge step** — `GitService.merge` + `studio_git_merge` + `/studio git merge`;
+  the runner auto-merges PRs once tasks reach `DONE`, unless the review policy
+  is `manual_merge`.
+- **Background scheduler loop** — `BackgroundScheduler` + `/studio start`/`stop`,
+  torn down on `session_shutdown`.
+- **`/studio config`** — list / get / set / setjson of settings.
+- **`/studio usage`** — org + per-project token/call/time stats.
+- **Notifications** — config-driven TUI notifications for blocked / escalation /
+  review-needed / failed (`notifications` setting).
+- **GitHub adapter** — `GitHubClient` (PRs, CI runs, repo info via `gh`) +
+  `/studio github [projectId]`.
+- **Plane comments** — push task messages as Plane issue comments
+  (`/studio plane comments <taskId>`).
+
 ## [0.6.0] - unreleased
 
 ### Added
