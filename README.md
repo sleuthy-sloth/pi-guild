@@ -146,19 +146,38 @@ work.
 
 ## Configuration
 
-Configuration lives in the SQLite `settings` table. Model routing is read by
-`ModelRouter` (`core/orchestration/model-router.ts`), which maps role names to a
-model and provider. A `/studio config` command is a planned follow-up.
+Configuration lives in the SQLite `settings` table, editable via `/studio config`.
 
 | Key | Description | Default |
 |-----|-------------|---------|
-| `modelRouter` | role → `{ model, provider }` (or a model-CLASS label) mapping | `{}` |
+| `modelRouter` | role → `{ model, provider }` overrides | `{}` |
+| `modelRouterClasses` | model class → `{ model, provider }` (see Model routing) | `{}` |
 | budgets (`organizations.budgets`) | token/call/minute/retry limits and `onLimit` behavior | `{ "onLimit": "continue" }` |
 | `maxConcurrentAgents` | scheduler concurrency bound | `4` |
 | `councilModels` | `[{ provider, model }]` members for multi-model synthesis | `[]` |
+| `notifications` | toggles for TUI notifications | all on |
 
 Model classes (never vendor names) route roles to models: `reasoning`,
 `cheap-reasoning`, `coding`, `cheap-coding`, `research`.
+
+## Model routing
+
+Assign models per role — either during `/studio setup` (it offers
+auto-assign / choose per class / skip) or anytime with `/studio models`:
+
+```text
+/studio models list                  # what's logged in on the harness
+/studio models auto                  # best-effort auto-assign all classes
+/studio models preset opencode-go    # auto-assign using only one provider
+/studio models class coding opencode-go/deepseek-v4-pro
+/studio models set Developer anthropic/claude-sonnet-4-5   # per-role override
+/studio models
+```
+
+Models are assigned per model-class, so five choices cover every role.
+Auto-assign reads the models the harness reports as logged in and prefers
+capability hints (e.g. `opus`/`sonnet` → reasoning, `haiku`/`mini`/`deepseek`
+→ cheap). No vendor names are hardcoded.
 
 ## Commands
 
@@ -188,6 +207,7 @@ All commands live under the `/studio` namespace:
 | `/studio plane setup <baseUrl> <slug> <apiKey>` / `status` / `sync [projectId]` / `comments <taskId>` | Plane mirror |
 | `/studio config [get <key>` / `set <key> <value>` / `setjson <key> <json>]` | read/write settings |
 | `/studio usage [projectId]` | token/call/time usage |
+| `/studio models [list` / `providers` / `auto` / `preset <provider>` / `set` / `class` / `clear]` | model routing |
 | `/studio dashboard [status` / `stop]` | start/stop the browser dashboard |
 | `/studio doctor` | DB path, counts, integrations, settings |
 | `/studio logs [N]` | last N audit entries |

@@ -7,6 +7,7 @@ import {
   createAgentSession,
   DefaultResourceLoader,
   getAgentDir,
+  ModelRuntime,
   SessionManager,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
@@ -34,6 +35,14 @@ const resolveCatalogModel = getModel as unknown as (
   provider: string,
   modelId: string,
 ) => Model<any> | undefined;
+
+// Lazy ModelRuntime so custom providers (e.g. opencode-go from models.json) can
+// resolve models, not just the static catalog.
+let modelRuntime: ModelRuntime | undefined;
+async function resolveModel(provider: string, modelId: string): Promise<Model<any> | undefined> {
+  if (!modelRuntime) modelRuntime = await ModelRuntime.create();
+  return modelRuntime.getModel(provider, modelId) ?? resolveCatalogModel(provider, modelId);
+}
 
 /** Built-in tool names that Pi's SDK can enable via the `tools` option. */
 const BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"];
@@ -171,7 +180,7 @@ export function createPiRunner(opts: CreatePiRunnerOptions): AgentRunner {
       let model: Model<any> | undefined;
       const resolved = router.resolve(agent.roleName);
       if (resolved?.model && resolved.provider) {
-        model = resolveCatalogModel(resolved.provider, resolved.model);
+        model = await resolveModel(resolved.provider, resolved.model);
       }
 
       const resourceLoader = new DefaultResourceLoader({

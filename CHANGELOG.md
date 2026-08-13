@@ -4,6 +4,24 @@ All notable changes to Pi Studio are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - unreleased
+
+### Added
+
+- **Model routing UX** — `/studio models` (`list`, `providers`, `auto`,
+  `preset <provider>`, `set <role>`, `class <class>`, `clear`), and the setup
+  wizard now offers auto-assign / choose-per-class / skip.
+- **Class-based assignment** — models are assigned per model class
+  (`modelRouterClasses`), so five choices cover every role; per-role overrides
+  on top.
+- **Auto-assign from the harness** — `ModelRouter.assignAuto` picks a model for
+  every class from the models Pi reports as logged in, preferring capability
+  hints (opus/sonnet → reasoning, haiku/mini/deepseek → cheap). No vendor
+  names are hardcoded.
+- **Custom-provider resolution** — the runner now resolves models via
+  `ModelRuntime` (not just the static catalog), so providers like
+  `opencode-go` from `models.json` work.
+
 ## [0.9.0] - unreleased
 
 ### Fixed / improved (pre-first-run hardening)

@@ -31,6 +31,27 @@ function formatUsage(s: {
   return `${s.totalCalls} calls, ${s.totalPromptTokens + s.totalCompletionTokens} tokens, ${Math.round(s.totalElapsedMs / 1000)}s`;
 }
 
+interface AvailModel {
+  provider: string;
+  id: string;
+  name?: string;
+}
+
+/** Models with valid auth configured on the harness (logged in). */
+function availableModels(ctx: ExtensionCommandContext): AvailModel[] {
+  try {
+    return ctx.modelRegistry.getAvailable().map((m) => ({ provider: m.provider, id: m.id, name: m.name }));
+  } catch {
+    return [];
+  }
+}
+
+function parseModelRef(ref: string): { provider: string; model: string } | undefined {
+  const slash = ref.lastIndexOf("/");
+  if (slash <= 0 || slash === ref.length - 1) return undefined;
+  return { provider: ref.slice(0, slash), model: ref.slice(slash + 1) };
+}
+
 const HELP = [
   "usage: /studio <subcommand> [args]",
   "",
@@ -53,6 +74,7 @@ const HELP = [
   "  logs [N]                      last N audit entries",
   "  config [get <key> | set <key> <value> | setjson <key> <json>]",
   "  usage [projectId]             token/call/time usage",
+  "  models [list|providers|auto [provider]|preset <provider>|set <role> p/m|class <c> p/m|clear]",
   "  dashboard [status | stop]     start/stop the browser dashboard",
   "  pause | resume                flip the scheduler pause flag",
   "  recover                       reset orphaned agents/tasks (also runs on start)",
@@ -326,6 +348,41 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
       const org = studio.organization.create(name.trim());
       studio.policy.seedDefaults(org.id);
       studio.repo.setSettingJson("currentOrgId", org.id);
+
+      const route = await ctx.ui.select("Model routing:", [
+        "Auto-assign from logged-in models (Recommended)",
+        "Choose per model class",
+        "Skip — assign later with /studio models",
+      ]);
+      if (route?.startsWith("Auto")) {
+        const assigned = studio.router.assignAuto(availableModels(ctx));
+        ctx.ui.notify(
+          assigned > 0 ? `Assigned ${assigned} model class(es).` : "No logged-in models found — assign later with /studio models.",
+          "info",
+        );
+        return `Created organization "${org.name}" (${org.id}) and seeded default policies.`;
+      }
+      if (route?.startsWith("Choose")) {
+        const models = availableModels(ctx);
+        if (models.length === 0) {
+          return "Created organization but found no logged-in models. Assign models later with /studio models.";
+        }
+        const classes: Array<[string, string]> = [
+          ["reasoning", "Reasoning"],
+          ["cheap-reasoning", "Cheap reasoning"],
+          ["coding", "Coding"],
+          ["cheap-coding", "Cheap coding"],
+          ["research", "Research"],
+        ];
+        for (const [cls, label] of classes) {
+          const choice = await ctx.ui.select(`${label} model:`, models.map((m) => `${m.provider}/${m.id}`));
+          if (choice) {
+            const parsed = parseModelRef(choice);
+            if (parsed) studio.router.setClassModel(cls, parsed.model, parsed.provider);
+          }
+        }
+        return `Created organization "${org.name}" and configured model routing.\n${studio.router.describe()}`;
+      }
       return `Created organization "${org.name}" (${org.id}) and seeded default policies.`;
     },
 
@@ -542,6 +599,54 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
         rejectEscalation: (id) => resolveEscalation(id, "REJECTED"),
       });
       return `Dashboard running at ${studio.dashboard.url}`;
+    },
+
+    async models(rest, ctx): Promise<string> {
+      if (rest[0] === "list") {
+        const models = availableModels(ctx);
+        return models.length === 0
+          ? "(no logged-in models)"
+          : models.map((m) => `${m.provider}/${m.id}${m.name ? `  (${m.name})` : ""}`).join("\n");
+      }
+      if (rest[0] === "providers") {
+        const models = availableModels(ctx);
+        const byProvider = new Map<string, number>();
+        for (const m of models) byProvider.set(m.provider, (byProvider.get(m.provider) ?? 0) + 1);
+        return byProvider.size === 0
+          ? "(no logged-in providers)"
+          : [...byProvider.entries()].map(([p, n]) => `${p} (${n} model${n > 1 ? "s" : ""})`).join("\n");
+      }
+      if (rest[0] === "auto") {
+        const assigned = studio.router.assignAuto(availableModels(ctx), { provider: rest[1] });
+        return assigned > 0
+          ? `Assigned ${assigned} model class(es).\n${studio.router.describe()}`
+          : "(no logged-in models to assign)";
+      }
+      if (rest[0] === "preset") {
+        const provider = rest[1];
+        if (!provider) return "usage: /studio models preset <provider> — e.g. opencode-go";
+        const assigned = studio.router.assignAuto(availableModels(ctx), { provider });
+        return assigned > 0
+          ? `Assigned ${assigned} model class(es) from ${provider}.\n${studio.router.describe()}`
+          : `No logged-in models for provider ${provider}.`;
+      }
+      if (rest[0] === "set") {
+        const parsed = parseModelRef(rest[2]);
+        if (!rest[1] || !parsed) return "usage: /studio models set <role> <provider>/<model>";
+        studio.router.setRoleModel(rest[1], parsed.model, parsed.provider);
+        return `Role ${rest[1]} -> ${parsed.provider}/${parsed.model}`;
+      }
+      if (rest[0] === "class") {
+        const parsed = parseModelRef(rest[2]);
+        if (!rest[1] || !parsed) return "usage: /studio models class <reasoning|cheap-reasoning|coding|cheap-coding|research> <provider>/<model>";
+        studio.router.setClassModel(rest[1], parsed.model, parsed.provider);
+        return `Class ${rest[1]} -> ${parsed.provider}/${parsed.model}`;
+      }
+      if (rest[0] === "clear") {
+        studio.router.clear();
+        return "Model routing cleared.";
+      }
+      return studio.router.describe();
     },
 
     async doctor(): Promise<string> {
