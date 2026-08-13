@@ -14,6 +14,7 @@ import { BackgroundScheduler, ProjectRunner, RecoveryService, type ReviewPolicy 
 import { GitHubProvider, LocalGitProvider } from "../../integrations/git/index.ts";
 import { HttpPlaneClient, PlaneSyncService } from "../../integrations/plane/index.ts";
 import { GitHubClient } from "../../integrations/github/index.ts";
+import { startDashboard } from "../../core/dashboard/server.ts";
 import { currentOrgId } from "../state.ts";
 import type { Studio } from "../state.ts";
 import { formatAgents, formatLive, formatTasks } from "../ui/index.ts";
@@ -51,6 +52,7 @@ const HELP = [
   "  logs [N]                      last N audit entries",
   "  config [get <key> | set <key> <value> | setjson <key> <json>]",
   "  usage [projectId]             token/call/time usage",
+  "  dashboard [status | stop]     start/stop the browser dashboard",
   "  pause | resume                flip the scheduler pause flag",
   "  recover                       reset orphaned agents/tasks (also runs on start)",
   "  stop <agentId> | stop project <id> | stop",
@@ -477,6 +479,45 @@ export function registerStudioCommand(pi: ExtensionAPI, studio: Studio): void {
         lines.push(`${p.name}: ${formatUsage(studio.repo.usageStats({ projectId: p.id }))}`);
       }
       return lines.join("\n");
+    },
+
+    async dashboard(rest): Promise<string> {
+      if (rest[0] === "stop") {
+        if (!studio.dashboard) return "Dashboard not running.";
+        await studio.dashboard.close();
+        studio.dashboard = undefined;
+        return "Dashboard stopped.";
+      }
+      if (rest[0] === "status") {
+        return studio.dashboard ? `Dashboard running at ${studio.dashboard.url}` : "Dashboard not running.";
+      }
+      if (studio.dashboard) return `Dashboard already running at ${studio.dashboard.url}`;
+
+      const resolveEscalation = (id: string, status: "APPROVED" | "REJECTED") => {
+        studio.repo.resolveEscalation(id, status);
+        studio.repo.audit({
+          actor: "human",
+          action: status === "APPROVED" ? "escalation.approve" : "escalation.reject",
+          entityType: "escalation",
+          entityId: id,
+        });
+        studio.repo.recordEvent(StudioEvents.humanEscalationResolved, { escalationId: id, status });
+        studio.bus.emit(StudioEvents.humanEscalationResolved, { escalationId: id, status });
+      };
+
+      studio.dashboard = await startDashboard({
+        repo: studio.repo,
+        isPaused: () => studio.paused,
+        pause: () => {
+          studio.paused = true;
+        },
+        resume: () => {
+          studio.paused = false;
+        },
+        approveEscalation: (id) => resolveEscalation(id, "APPROVED"),
+        rejectEscalation: (id) => resolveEscalation(id, "REJECTED"),
+      });
+      return `Dashboard running at ${studio.dashboard.url}`;
     },
 
     async doctor(): Promise<string> {

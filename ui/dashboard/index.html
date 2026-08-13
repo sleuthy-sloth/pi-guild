@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pi Studio</title>
+<style>
+  :root {
+    --bg: #0d1017;
+    --panel: #151a23;
+    --panel-2: #1a2029;
+    --border: #232b38;
+    --text: #e6edf3;
+    --muted: #8b98a9;
+    --dim: #5b6672;
+    --accent: #6ea8fe;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --orange: #f0883e;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --teal: #39c5cf;
+    --blue: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1 { font-size: 16px; margin: 0; letter-spacing: 0.3px; }
+  header .dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--green);
+    box-shadow: 0 0 0 3px rgba(63,185,80,0.18);
+  }
+  header .dot.paused { background: var(--yellow); box-shadow: 0 0 0 3px rgba(210,153,34,0.18); }
+  header .spacer { flex: 1; }
+  button {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  button:hover { border-color: var(--accent); }
+  button.danger:hover { border-color: var(--red); color: var(--red); }
+  main { padding: 20px; max-width: 1280px; margin: 0 auto; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px;
+  }
+  .stat .value { font-size: 26px; font-weight: 600; }
+  .stat .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .card h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted);
+    margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card h2 .count { color: var(--accent); }
+  .card .body { padding: 8px 16px 12px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--dim); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--panel-2); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--dim); font-size: 11px; }
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 500;
+    background: var(--panel-2); color: var(--muted); white-space: nowrap;
+  }
+  .pill.working, .pill.in_progress { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .pill.idle { color: var(--dim); }
+  .pill.blocked { background: rgba(240,136,62,0.15); color: var(--orange); }
+  .pill.waiting { background: rgba(210,153,34,0.15); color: var(--yellow); }
+  .pill.reviewing, .pill.review { background: rgba(188,140,255,0.15); color: var(--purple); }
+  .pill.failed { background: rgba(248,81,73,0.15); color: var(--red); }
+  .pill.completed, .pill.done { background: rgba(63,185,80,0.15); color: var(--green); }
+  .pill.qa { background: rgba(57,197,207,0.15); color: var(--teal); }
+  .pill.ready { background: rgba(210,153,34,0.15); color: var(--yellow); }
+  .pill.backlog { color: var(--dim); }
+  .pill.cancelled, .pill.stopped, .pill.created { color: var(--dim); }
+  .pill.starting, .pill.planning { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .empty { color: var(--dim); padding: 10px 0; font-style: italic; }
+  .escalation {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; margin-bottom: 8px;
+  }
+  .escalation .problem { font-weight: 500; margin-bottom: 4px; }
+  .escalation .meta { color: var(--dim); font-size: 11px; margin-bottom: 8px; }
+  .escalation.open { border-color: rgba(240,136,62,0.4); }
+  .msg { padding: 5px 0; border-bottom: 1px solid var(--panel-2); font-size: 13px; }
+  .msg:last-child { border-bottom: none; }
+  .msg .who { color: var(--accent); }
+  .msg .type { color: var(--dim); font-size: 11px; margin-left: 6px; }
+  .usage { color: var(--muted); font-size: 13px; }
+  .pr { padding: 5px 0; border-bottom: 1px solid var(--panel-2); }
+  .pr a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<header>
+  <div class="dot" id="dot"></div>
+  <h1>Pi Studio</h1>
+  <span id="pausedTag" class="pill"></span>
+  <div class="spacer"></div>
+  <button id="pauseBtn">Pause</button>
+  <button id="refreshBtn">Refresh</button>
+</header>
+<main>
+  <section class="stats" id="stats"></section>
+  <section class="grid">
+    <div class="card"><h2>Agents <span class="count" id="agentCount"></span></h2><div class="body" id="agents"></div></div>
+    <div class="card"><h2>Tasks <span class="count" id="taskCount"></span></h2><div class="body" id="tasks"></div></div>
+    <div class="card"><h2>Escalations</h2><div class="body" id="escalations"></div></div>
+    <div class="card"><h2>Pull Requests</h2><div class="body" id="prs"></div></div>
+    <div class="card"><h2>Recent Messages</h2><div class="body" id="messages"></div></div>
+    <div class="card"><h2>Projects</h2><div class="body" id="projects"></div></div>
+  </section>
+</main>
+<script>
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function pill(state) {
+  return '<span class="pill ' + esc(state).toLowerCase() + '">' + esc(state) + '</span>';
+}
+function shortId(id) { return id ? id.slice(0, 8) : ''; }
+
+function renderStats(d) {
+  const agentsByState = {};
+  d.agents.forEach(a => agentsByState[a.state] = (agentsByState[a.state] || 0) + 1);
+  const tasksByState = {};
+  d.tasks.forEach(t => tasksByState[t.state] = (tasksByState[t.state] || 0) + 1);
+  const working = (agentsByState.WORKING || 0) + (agentsByState.STARTING || 0);
+  const done = tasksByState.DONE || 0;
+  const tokens = d.usage.totalPromptTokens + d.usage.totalCompletionTokens;
+  const cards = [
+    ['Organizations', d.organizations.length],
+    ['Projects', d.projects.length],
+    ['Agents', d.agents.length, working + ' working'],
+    ['Tasks', d.tasks.length, done + ' done'],
+    ['Open escalations', d.escalations.filter(e => e.status === 'OPEN').length],
+    ['Usage', d.usage.totalCalls + ' calls', tokens.toLocaleString() + ' tok'],
+  ];
+  document.getElementById('stats').innerHTML = cards.map(c =>
+    '<div class="stat"><div class="value">' + c[1] + '</div><div class="label">' + c[0] +
+    (c[2] ? ' · ' + c[2] : '') + '</div></div>'
+  ).join('');
+}
+
+function renderAgents(d) {
+  document.getElementById('agentCount').textContent = d.agents.length;
+  if (!d.agents.length) { document.getElementById('agents').innerHTML = '<div class="empty">No agents yet.</div>'; return; }
+  const rows = d.agents.map(a =>
+    '<tr><td>' + esc(a.name) + '</td><td>' + pill(a.roleName === a.state ? a.state : a.state) + '</td>' +
+    '<td>' + esc(a.roleName) + '</td><td class="id">' + (a.currentTaskId ? shortId(a.currentTaskId) : '—') + '</td></tr>'
+  ).join('');
+  document.getElementById('agents').innerHTML =
+    '<table><tr><th>Name</th><th>State</th><th>Role</th><th>Task</th></tr>' + rows + '</table>';
+}
+
+function renderTasks(d) {
+  document.getElementById('taskCount').textContent = d.tasks.length;
+  if (!d.tasks.length) { document.getElementById('tasks').innerHTML = '<div class="empty">No tasks yet.</div>'; return; }
+  const rows = d.tasks.map(t =>
+    '<tr><td>' + esc(t.title) + '</td><td>' + pill(t.state) + '</td>' +
+    '<td>' + esc(t.priority) + '</td><td class="id">' + shortId(t.assigneeId || '') + '</td></tr>'
+  ).join('');
+  document.getElementById('tasks').innerHTML =
+    '<table><tr><th>Title</th><th>State</th><th>Priority</th><th>Assignee</th></tr>' + rows + '</table>';
+}
+
+function renderEscalations(d) {
+  if (!d.escalations.length) { document.getElementById('escalations').innerHTML = '<div class="empty">Nothing needs a decision.</div>'; return; }
+  document.getElementById('escalations').innerHTML = d.escalations.map(e =>
+    '<div class="escalation ' + esc(e.status).toLowerCase() + '">' +
+      '<div class="problem">' + esc(e.problem) + '</div>' +
+      '<div class="meta">' + shortId(e.id) + ' · ' + esc(e.status) + (e.recommendation ? ' · rec: ' + esc(e.recommendation) : '') + '</div>' +
+      (e.status === 'OPEN'
+        ? '<button data-action="approve" data-id="' + esc(e.id) + '">Approve</button> ' +
+          '<button class="danger" data-action="reject" data-id="' + esc(e.id) + '">Reject</button>'
+        : '') +
+    '</div>'
+  ).join('');
+}
+
+function renderPrs(d) {
+  if (!d.pullRequests.length) { document.getElementById('prs').innerHTML = '<div class="empty">No pull requests.</div>'; return; }
+  document.getElementById('prs').innerHTML = d.pullRequests.map(p =>
+    '<div class="pr">' +
+      (p.url ? '<a href="' + esc(p.url) + '" target="_blank">' + esc(p.title) + '</a>' : '<span>' + esc(p.title) + '</span>') +
+      ' <span class="pill">' + esc(p.state) + '</span> <span class="id">' + esc(p.branch || '') + '</span>' +
+    '</div>'
+  ).join('');
+}
+
+function renderMessages(d) {
+  if (!d.messages.length) { document.getElementById('messages').innerHTML = '<div class="empty">No messages.</div>'; return; }
+  document.getElementById('messages').innerHTML = d.messages.map(m =>
+    '<div class="msg"><span class="who">' + esc(m.senderName) + '</span><span class="type">[' + esc(m.messageType) + ']</span> ' +
+    esc(m.content.slice(0, 160)) + '</div>'
+  ).join('');
+}
+
+function renderProjects(d) {
+  if (!d.projects.length) { document.getElementById('projects').innerHTML = '<div class="empty">No projects.</div>'; return; }
+  const rows = d.projects.map(p =>
+    '<tr><td>' + esc(p.name) + '</td><td class="id">' + shortId(p.id) + '</td>' +
+    '<td>' + (p.metrics.tasksDone || 0) + '/' + (p.metrics.tasksTotal || 0) + '</td></tr>'
+  ).join('');
+  document.getElementById('projects').innerHTML =
+    '<table><tr><th>Project</th><th>Id</th><th>Done/Total</th></tr>' + rows + '</table>';
+}
+
+function render(d) {
+  renderStats(d);
+  renderAgents(d);
+  renderTasks(d);
+  renderEscalations(d);
+  renderPrs(d);
+  renderMessages(d);
+  renderProjects(d);
+  document.getElementById('dot').className = 'dot' + (d.paused ? ' paused' : '');
+  document.getElementById('pausedTag').textContent = d.paused ? 'paused' : '';
+  document.getElementById('pausedTag').style.display = d.paused ? '' : 'none';
+  document.getElementById('pauseBtn').textContent = d.paused ? 'Resume' : 'Pause';
+}
+
+async function refresh() {
+  try {
+    const res = await fetch('/api/state');
+    render(await res.json());
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function action(path, body) {
+  try {
+    await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+    await refresh();
+  } catch (e) { console.error(e); }
+}
+
+document.getElementById('pauseBtn').addEventListener('click', async () => {
+  const res = await fetch('/api/state');
+  const d = await res.json();
+  await action(d.paused ? '/api/resume' : '/api/pause');
+});
+document.getElementById('refreshBtn').addEventListener('click', refresh);
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const path = btn.dataset.action === 'approve' ? '/api/approve' : '/api/reject';
+  action(path, { id: btn.dataset.id });
+});
+
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

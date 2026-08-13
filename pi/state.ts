@@ -34,6 +34,7 @@ import {
 } from "../core/orchestration/index.ts";
 import { seedRoles } from "../agents/roles.ts";
 import { GitService } from "../core/git/service.ts";
+import type { DashboardServer } from "../core/dashboard/server.ts";
 import { createStudioToolDefinitions } from "./tools/index.ts";
 
 export { currentOrgId } from "./currentOrg.ts";
@@ -57,6 +58,8 @@ export interface Studio {
   git: GitService;
   /** Created on `/studio start`; torn down on shutdown. */
   background?: BackgroundScheduler;
+  /** Created on `/studio dashboard`; closed on shutdown. */
+  dashboard?: DashboardServer;
   paused: boolean;
 }
 
@@ -104,6 +107,7 @@ export function getStudio(): Studio {
     council,
     git,
     background: undefined,
+    dashboard: undefined,
     paused: false,
   };
 
@@ -137,6 +141,7 @@ export function getStudio(): Studio {
 export function resetStudio(): void {
   if (!memo) return;
   memo.background?.stop();
+  if (memo.dashboard) void memo.dashboard.close();
   try {
     memo.db.close();
   } catch {

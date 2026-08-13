@@ -188,6 +188,7 @@ All commands live under the `/studio` namespace:
 | `/studio plane setup <baseUrl> <slug> <apiKey>` / `status` / `sync [projectId]` / `comments <taskId>` | Plane mirror |
 | `/studio config [get <key>` / `set <key> <value>` / `setjson <key> <json>]` | read/write settings |
 | `/studio usage [projectId]` | token/call/time usage |
+| `/studio dashboard [status` / `stop]` | start/stop the browser dashboard |
 | `/studio doctor` | DB path, counts, integrations, settings |
 | `/studio logs [N]` | last N audit entries |
 | `/studio github [projectId]` | PR / CI status via `gh` |
@@ -286,6 +287,15 @@ related messages — and injects it into the agent's prompt. Extensible via
 Pi Studio surfaces a live agent panel in the TUI (org/project/task counts plus
 the agent roster). It refreshes on session start, on `/studio live`, and during
 an autonomous run.
+
+## Browser dashboard
+
+An optional local web dashboard (`/studio dashboard`, `/studio dashboard stop`)
+serves a read-only view of the organization at `http://127.0.0.1:<port>` — stat
+cards, color-coded agent and task tables, escalations with approve/reject, pull
+requests, recent messages, and usage. It auto-refreshes every 2 seconds and
+offers pause/resume. One self-contained HTML page + Node's built-in `http` — no
+framework, no build step, no Docker. The Pi TUI remains primary.
 
 ## Notifications
 

@@ -4,6 +4,16 @@ All notable changes to Pi Studio are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - unreleased
+
+### Added
+
+- **Browser dashboard** (`core/dashboard/server.ts` + `ui/dashboard/index.html`) —
+  an optional, explicitly-started local web dashboard (`/studio dashboard`).
+  Read-only snapshot of the SQLite DB (agents, tasks, escalations, PRs,
+  messages, projects, usage) + pause/resume and approve/reject actions, served
+  by Node's `http` with a self-contained dark UI and 2s auto-refresh.
+
 ## [0.7.0] - unreleased
 
 ### Added
