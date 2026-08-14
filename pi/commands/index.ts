@@ -18,7 +18,8 @@ import { GitHubClient } from "../../integrations/github/index.ts";
 import { startDashboard } from "../../core/dashboard/server.ts";
 import { currentOrgId } from "../state.ts";
 import type { Guild } from "../state.ts";
-import { formatAgents, formatLive, formatTasks } from "../ui/index.ts";
+import { formatActivity, formatAgents, formatLive, formatTasks } from "../ui/index.ts";
+import { getLiveFeed } from "../live.ts";
 
 type Handler = (rest: string[], ctx: ExtensionCommandContext) => Promise<string>;
 
@@ -59,6 +60,8 @@ const HELP = [
   "  council [question | members | add <provider>/<model>]",
   "  bg [<role> <prompt>]           fire-and-forget background job",
   "  live                          refresh the live agent panel",
+  "  activity                      recent agent/task activity feed",
+  "  quit | exit                   stop scheduler, agents, and dashboard",
   "  git setup <project> local <path> | github <url>",
   "  git branch|commit|push|pr|merge|log <taskId>",
   "  status                        org/project/agent/task counts + paused flag",
@@ -79,6 +82,7 @@ const HELP = [
   "  pause | resume                flip the scheduler pause flag",
   "  recover                       reset orphaned agents/tasks (also runs on start)",
   "  stop <agentId> | stop project <id> | stop",
+  "  quit | exit                   stop everything and clear the panel",
   "  approve <id> | reject <id>    resolve a human escalation",
   "  escalate                      create a human escalation",
   "  start                         start the background scheduler loop",
@@ -101,6 +105,27 @@ export function registerGuildCommand(pi: ExtensionAPI, guild: Guild): void {
   }
 
   const handlers: Record<string, Handler> = {
+    async quit(_rest, ctx): Promise<string> {
+      const stopped: string[] = [];
+      if (guild.background?.isRunning()) {
+        guild.background.stop();
+        guild.background = undefined;
+        stopped.push("scheduler");
+      }
+      const running = guild.agents.list().filter((a) => a.state === "WORKING" || a.state === "STARTING");
+      for (const a of running) guild.spawner.stop(a.id);
+      if (running.length > 0) stopped.push(`${running.length} agent${running.length === 1 ? "" : "s"}`);
+      if (guild.dashboard) {
+        await guild.dashboard.close();
+        guild.dashboard = undefined;
+        stopped.push("dashboard");
+      }
+      guild.paused = true;
+      if (ctx.hasUI) ctx.ui.setWidget("guild-live", undefined);
+      return stopped.length === 0
+        ? "Guild is idle."
+        : `Guild quit — stopped ${stopped.join(", ")}. /guild start to resume.`;
+    },
     async run(_rest, ctx): Promise<string> {
       if (!ctx.hasUI) return "run requires an interactive UI";
 
@@ -186,6 +211,11 @@ export function registerGuildCommand(pi: ExtensionAPI, guild: Guild): void {
     async live(_rest, ctx): Promise<string> {
       refreshLive(ctx);
       return formatLive(guild);
+    },
+
+    async activity(): Promise<string> {
+      const lines = formatActivity(guild, getLiveFeed());
+      return lines.length === 0 ? "(no activity yet)" : lines.join("\n");
     },
 
     async git(rest): Promise<string> {
@@ -459,7 +489,7 @@ export function registerGuildCommand(pi: ExtensionAPI, guild: Guild): void {
         guild.spawner.stop(id);
         return `Stopped agent ${agent.name} (${id})`;
       }
-      return formatAgents(guild.agents.list());
+      return formatAgents(guild.agents.list(), guild.tasks.list());
     },
 
     async tasks(rest): Promise<string> {
@@ -763,6 +793,7 @@ export function registerGuildCommand(pi: ExtensionAPI, guild: Guild): void {
 
     async start(): Promise<string> {
       if (guild.background?.isRunning()) return "Background scheduler already running.";
+      guild.paused = false;
       guild.background = new BackgroundScheduler(
         guild.repo,
         (projectId) => {
@@ -848,6 +879,7 @@ export function registerGuildCommand(pi: ExtensionAPI, guild: Guild): void {
       return HELP;
     },
   };
+  handlers.exit = handlers.quit;
 
   function resolveEscalation(rest: string[], status: "APPROVED" | "REJECTED"): string {
     const id = rest[0];

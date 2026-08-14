@@ -50,6 +50,7 @@ export function buildState(repo: GuildRepository, paused: boolean) {
     escalations: repo.listEscalations(),
     usage: repo.usageStats(),
     roles: repo.listRoles(),
+    events: repo.listEvents(50),
   };
 }
 

@@ -216,23 +216,23 @@ truth.
 
 ## What it looks like
 
-**The live TUI panel** (`/guild live`) — org/project/task counts plus the agent
-roster, updated live during runs:
+**The live TUI panel** (`/guild live`) — org/project/task counts, the agent
+roster with each agent's current task, and a rolling activity feed, all updated
+live as agents work:
 
 ```text
 Pi Guild — live
 orgs=1 projects=1 paused=false
 tasks: DONE=1 IN_PROGRESS=1 REVIEW=1 QA=1 BACKLOG=1
 
-name       role       state      id
-architect  Architect  IDLE       6e5a5e1d
-ceo        CEO        IDLE       2757689e
-designer   Designer   IDLE       1fd1eb2b
-dev-1      Developer  WORKING    97002811
-dev-2      Developer  BLOCKED    4322226c
-manager    Manager    WORKING    93985055
-qa         QA         WAITING    a6877c1b
-reviewer   Reviewer   REVIEWING  a4106543
+name       role       state      task                          id
+architect  Architect  IDLE       —                             6e5a5e1d
+dev-1      Developer  WORKING    Implement: CLI calculator [I…  97002811
+reviewer   Reviewer   REVIEWING  Review & document: CLI calc…   a4106543
+
+recent:
+16:44:02  dev-1 → bash
+16:44:01  dev-1 started Implement: CLI calculator
 ```
 
 **The browser dashboard** (`/guild dashboard`) — the same state in a live,
@@ -322,7 +322,9 @@ All commands live under the `/guild` namespace:
 | `/guild stop <agentId>` / `stop project <id>` / `stop` | stop an agent, a project's agents, or the background scheduler |
 | `/guild council [question]` / `members` / `add <provider>/<model>` / `reset` | multi-model synthesis |
 | `/guild bg <role> <prompt>` | fire-and-forget background job |
-| `/guild live` | refresh the live agent panel |
+| `/guild live` | refresh the live agent panel (task + activity feed) |
+| `/guild activity` | recent agent/task activity feed |
+| `/guild quit` / `exit` | stop scheduler, agents, and dashboard; clear the panel |
 | `/guild start` | start the background scheduler loop |
 | `/guild git setup <project> local <path>` / `github <url>` | register a repository |
 | `/guild git branch` / `commit` / `push` / `pr` / `merge` / `log <taskId>` | the git workflow |

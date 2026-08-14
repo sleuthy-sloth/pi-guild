@@ -134,6 +134,7 @@
     <div class="card"><h2>Escalations</h2><div class="body" id="escalations"></div></div>
     <div class="card"><h2>Pull Requests</h2><div class="body" id="prs"></div></div>
     <div class="card"><h2>Recent Messages</h2><div class="body" id="messages"></div></div>
+    <div class="card"><h2>Activity</h2><div class="body" id="activity"></div></div>
     <div class="card"><h2>Projects</h2><div class="body" id="projects"></div></div>
   </section>
 </main>
@@ -171,10 +172,13 @@ function renderStats(d) {
 function renderAgents(d) {
   document.getElementById('agentCount').textContent = d.agents.length;
   if (!d.agents.length) { document.getElementById('agents').innerHTML = '<div class="empty">No agents yet.</div>'; return; }
-  const rows = d.agents.map(a =>
-    '<tr><td>' + esc(a.name) + '</td><td>' + pill(a.roleName === a.state ? a.state : a.state) + '</td>' +
-    '<td>' + esc(a.roleName) + '</td><td class="id">' + (a.currentTaskId ? shortId(a.currentTaskId) : '—') + '</td></tr>'
-  ).join('');
+  const taskById = {};
+  d.tasks.forEach(t => taskById[t.id] = t.title);
+  const rows = d.agents.map(a => {
+    const title = a.currentTaskId && taskById[a.currentTaskId] ? taskById[a.currentTaskId] : '—';
+    return '<tr><td>' + esc(a.name) + '</td><td>' + pill(a.state) + '</td><td>' + esc(a.roleName) + '</td>' +
+      '<td>' + esc(title) + ' <span class="id">' + (a.currentTaskId ? shortId(a.currentTaskId) : '') + '</span></td></tr>';
+  }).join('');
   document.getElementById('agents').innerHTML =
     '<table><tr><th>Name</th><th>State</th><th>Role</th><th>Task</th></tr>' + rows + '</table>';
 }
@@ -224,6 +228,22 @@ function renderMessages(d) {
   ).join('');
 }
 
+function renderActivity(d) {
+  const el = document.getElementById('activity');
+  const events = d.events || [];
+  if (!events.length) { el.innerHTML = '<div class="empty">No activity yet.</div>'; return; }
+  const byId = {};
+  d.agents.forEach(a => byId[a.id] = a.name);
+  d.tasks.forEach(t => byId[t.id] = t.title);
+  const name = (id) => id ? (byId[id] || String(id).slice(0, 8)) : '—';
+  el.innerHTML = events.slice().reverse().slice(-40).map(e => {
+    const p = e.payload || {};
+    const who = p.agentId ? name(p.agentId) : (p.taskId ? name(p.taskId) : '—');
+    return '<div class="msg"><span class="id">' + esc(new Date(e.createdAt).toLocaleTimeString()) + '</span> ' +
+      '<span class="who">' + esc(who) + '</span> ' + esc(e.type) + '</div>';
+  }).join('');
+}
+
 function renderProjects(d) {
   if (!d.projects.length) { document.getElementById('projects').innerHTML = '<div class="empty">No projects.</div>'; return; }
   const rows = d.projects.map(p =>
@@ -241,6 +261,7 @@ function render(d) {
   renderEscalations(d);
   renderPrs(d);
   renderMessages(d);
+  renderActivity(d);
   renderProjects(d);
   document.getElementById('dot').className = 'dot' + (d.paused ? ' paused' : '');
   document.getElementById('pausedTag').textContent = d.paused ? 'paused' : '';

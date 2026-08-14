@@ -13,6 +13,7 @@ import { registerGuildCommand } from "./commands/index.ts";
 import { registerGuildTools, GUILD_TOOL_NAMES } from "./tools/index.ts";
 import { formatLive } from "./ui/index.ts";
 import { installNotifications } from "./notifications.ts";
+import { startLiveFeed, resetLiveFeed } from "./live.ts";
 
 let wired = false;
 let removeNotifications: (() => void) | undefined;
@@ -30,7 +31,12 @@ export default function (pi: ExtensionAPI) {
     const active = pi.getActiveTools();
     pi.setActiveTools([...new Set([...active, ...GUILD_TOOL_NAMES])]);
 
-    if (ctx.hasUI) ctx.ui.setWidget("guild-live", formatLive(guild).split("\n"));
+    if (ctx.hasUI) {
+      ctx.ui.setWidget("guild-live", formatLive(guild).split("\n"));
+      startLiveFeed(guild.bus, () => {
+        if (ctx.hasUI) ctx.ui.setWidget("guild-live", formatLive(guild).split("\n"));
+      });
+    }
 
     removeNotifications?.();
     removeNotifications = installNotifications({ repo: guild.repo, bus: guild.bus }, (message, kind) =>
@@ -41,6 +47,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_shutdown", () => {
     removeNotifications?.();
     removeNotifications = undefined;
+    resetLiveFeed();
     resetGuild();
   });
 }

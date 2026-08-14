@@ -18,6 +18,7 @@ import type { GuildRepository } from "../repository.ts";
 import { ABORT_SIGNAL_KEY, type AgentRunner, type AgentRunResult } from "./spawner.ts";
 import type { ModelRouter } from "./model-router.ts";
 import { ContextAssembler } from "../context/assembler.ts";
+import { bus } from "../events.ts";
 
 /**
  * createPiRunner — the real runtime adapter (spec §20, §54).
@@ -213,11 +214,14 @@ export function createPiRunner(opts: CreatePiRunnerOptions): AgentRunner {
         tools: sessionTools,
       });
 
-      // Capture the agent's final answer as the run summary (streamed deltas).
+      // Capture the agent's final answer as the run summary (streamed deltas)
+      // and surface each tool invocation on the live feed.
       let finalText = "";
       const unsubscribe = session.subscribe((event) => {
         if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
           finalText += event.assistantMessageEvent.delta;
+        } else if (event.type === "tool_execution_start") {
+          bus.emit("agent.activity", { agentId: agent.id, action: `→ ${event.toolName}` });
         }
       });
 
